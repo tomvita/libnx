@@ -11,9 +11,6 @@
 #include "../services/btdrv_types.h"
 #include "../sf/service.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
 // Begin enums and output structs
 
 /// HidDebugPadButton
@@ -200,8 +197,8 @@ typedef enum {
     HidKeyboardModifier_Hiragana      = BIT(12),
 } HidKeyboardModifier;
 
-/// HidKeyboardScancode \deprecated
-typedef enum DEPRECATED {
+/// HidKeyboardScancode
+typedef enum {
     KBD_NONE = 0x00,
     KBD_ERR_OVF = 0x01,
 
@@ -474,8 +471,8 @@ typedef enum {
     HidNpadButton_AnySR    = HidNpadButton_LeftSR | HidNpadButton_RightSR,                                 ///< Bitmask containing SR buttons on both Joy-Cons (Left/Right)
 } HidNpadButton;
 
-/// HidControllerKeys \deprecated
-typedef enum DEPRECATED {
+/// HidControllerKeys
+typedef enum {
     KEY_A            = HidNpadButton_A,
     KEY_B            = HidNpadButton_B,
     KEY_X            = HidNpadButton_X,
@@ -523,8 +520,8 @@ typedef enum DEPRECATED {
     KEY_SR    = HidNpadButton_AnySR,
 } HidControllerKeys;
 
-/// HidControllerJoystick \deprecated
-typedef enum DEPRECATED {
+/// HidControllerJoystick
+typedef enum {
     JOYSTICK_LEFT  = 0,
     JOYSTICK_RIGHT = 1,
 
@@ -593,8 +590,8 @@ typedef enum {
     HidGestureType_Rotate              = 9,    ///< Rotate
 } HidGestureType;
 
-/// HidControllerID \deprecated
-typedef enum DEPRECATED {
+/// HidControllerID
+typedef enum {
     CONTROLLER_PLAYER_1 = 0,
     CONTROLLER_PLAYER_2 = 1,
     CONTROLLER_PLAYER_3 = 2,
@@ -809,8 +806,8 @@ typedef enum {
     HidPalmaFeature_MuteSwitch                              = BIT(3),     ///< MuteSwitch
 } HidPalmaFeature;
 
-/// touchPosition \deprecated
-typedef struct DEPRECATED touchPosition {
+/// touchPosition
+typedef struct touchPosition {
     u32 id;
     u32 px;
     u32 py;
@@ -825,14 +822,14 @@ typedef struct HidAnalogStickState {
     s32 y;                                    ///< Y
 } HidAnalogStickState;
 
-/// JoystickPosition \deprecated
-typedef struct DEPRECATED JoystickPosition {
+/// JoystickPosition
+typedef struct JoystickPosition {
     s32 dx;
     s32 dy;
 } JoystickPosition;
 
-/// MousePosition \deprecated
-typedef struct DEPRECATED MousePosition {
+/// MousePosition
+typedef struct MousePosition {
     s32 x;
     s32 y;
     s32 velocityX;
@@ -853,8 +850,8 @@ typedef struct HidDirectionState {
     float direction[3][3];                      ///< 3x3 matrix
 } HidDirectionState;
 
-/// SixAxisSensorValues \deprecated DEPRECATED
-typedef struct DEPRECATED SixAxisSensorValues {
+/// SixAxisSensorValues
+typedef struct SixAxisSensorValues {
     HidVector accelerometer;
     HidVector gyroscope;
     HidVector unk;
@@ -1454,7 +1451,7 @@ Result hidInitialize(void);
 /// Exit hid. Called automatically during app exit.
 void hidExit(void);
 
-void DEPRECATED hidReset(void); ///< \deprecated
+void hidReset(void);
 
 /// Gets the Service object for the actual hid service session.
 Service* hidGetServiceSession(void);
@@ -1462,7 +1459,7 @@ Service* hidGetServiceSession(void);
 /// Gets the address of the SharedMemory.
 void* hidGetSharedmemAddr(void);
 
-void DEPRECATED hidScanInput(void); ///< \deprecated
+void hidScanInput(void);
 
 ///@name TouchScreen
 ///@{
@@ -1732,38 +1729,37 @@ size_t hidGetGestureStates(HidGestureState *states, size_t count);
 
 ///@}
 
-bool DEPRECATED hidIsControllerConnected(HidControllerID id); ///< \deprecated
+bool hidIsControllerConnected(HidControllerID id);
 
-u64 DEPRECATED hidKeysHeld(HidControllerID id); ///< \deprecated
-u64 DEPRECATED hidKeysDown(HidControllerID id); ///< \deprecated
-u64 DEPRECATED hidKeysUp(HidControllerID id); ///< \deprecated
+u64 hidKeysHeld(HidControllerID id);
+u64 hidKeysDown(HidControllerID id);
+u64 hidKeysUp(HidControllerID id);
 
-u64 DEPRECATED hidMouseButtonsHeld(void); ///< \deprecated
-u64 DEPRECATED hidMouseButtonsDown(void); ///< \deprecated
-u64 DEPRECATED hidMouseButtonsUp(void); ///< \deprecated
-void DEPRECATED hidMouseRead(MousePosition *pos); ///< \deprecated
-u32 DEPRECATED hidMouseMultiRead(MousePosition *entries, u32 num_entries); ///< \deprecated
+u64 hidMouseButtonsHeld(void);
+u64 hidMouseButtonsDown(void);
+u64 hidMouseButtonsUp(void);
+void hidMouseRead(MousePosition *pos);
+u32 hidMouseMultiRead(MousePosition *entries, u32 num_entries);
 
-bool DEPRECATED hidKeyboardModifierHeld(HidKeyboardModifier modifier); ///< \deprecated
-bool DEPRECATED hidKeyboardModifierDown(HidKeyboardModifier modifier); ///< \deprecated
-bool DEPRECATED hidKeyboardModifierUp(HidKeyboardModifier modifier); ///< \deprecated
+bool hidKeyboardModifierHeld(HidKeyboardModifier modifier);
+bool hidKeyboardModifierDown(HidKeyboardModifier modifier);
+bool hidKeyboardModifierUp(HidKeyboardModifier modifier);
 
-bool DEPRECATED hidKeyboardHeld(HidKeyboardScancode key); ///< \deprecated
-bool DEPRECATED hidKeyboardDown(HidKeyboardScancode key); ///< \deprecated
-bool DEPRECATED hidKeyboardUp(HidKeyboardScancode key); ///< \deprecated
+bool hidKeyboardHeld(HidKeyboardScancode key);
+bool hidKeyboardDown(HidKeyboardScancode key);
+bool hidKeyboardUp(HidKeyboardScancode key);
 
-u32 DEPRECATED hidTouchCount(void); ///< \deprecated
-void DEPRECATED hidTouchRead(touchPosition *pos, u32 point_id); ///< \deprecated
+u32 hidTouchCount(void);
+void hidTouchRead(touchPosition *pos, u32 point_id);
 
-void DEPRECATED hidJoystickRead(JoystickPosition *pos, HidControllerID id, HidControllerJoystick stick); ///< \deprecated
-u32 DEPRECATED hidSixAxisSensorValuesRead(SixAxisSensorValues *values, HidControllerID id, u32 num_entries); ///< \deprecated
+void hidJoystickRead(JoystickPosition *pos, HidControllerID id, HidControllerJoystick stick);
+u32 hidSixAxisSensorValuesRead(SixAxisSensorValues *values, HidControllerID id, u32 num_entries);
 
 /**
  * @brief This can be used to check what CONTROLLER_P1_AUTO uses.
  * @return 0 when CONTROLLER_PLAYER_1 is connected, otherwise returns 1 for handheld-mode.
- * @deprecated
  */
-bool DEPRECATED hidGetHandheldMode(void);
+bool hidGetHandheldMode(void);
 
 /**
  * @brief SendKeyboardLockKeyEvent
@@ -2501,4 +2497,3 @@ Result hidSetTouchScreenConfiguration(const HidTouchScreenConfigurationForNx *co
  */
 Result hidIsFirmwareUpdateNeededForNotification(bool *out);
 
-#pragma GCC diagnostic pop
