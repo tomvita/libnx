@@ -561,7 +561,7 @@ Result btdrvRespondToPinRequest(BtdrvAddress addr, const BtdrvPinCode *pin_code)
  * @param[in] accept Whether the request is accepted.
  * @param[in] passkey Passkey.
  */
-Result btdrvRespondToSspRequest(BtdrvAddress addr, u8 variant, bool accept, u32 passkey);
+Result btdrvRespondToSspRequest(BtdrvAddress addr, u32 variant, bool accept, u32 passkey);
 
 /**
  * @brief GetEventInfo
@@ -1453,6 +1453,38 @@ Result btdrvAcquireAudioConnectionStateChangedEvent(Event* out_event, bool autoc
  * @param[out] total_out Total output entries.
  */
 Result btdrvGetConnectedAudioDevice(BtdrvAddress *addrs, s32 count, s32 *total_out);
+
+/**
+ * @brief CloseAudioControlInput
+ * @note Only available on [13.0.0+].
+ * @param[in] addr \ref BtdrvAddress
+ */
+Result btdrvCloseAudioControlInput(BtdrvAddress addr);
+
+/**
+ * @brief RegisterAudioControlNotification
+ * @note Only available on [13.0.0+].
+ * @param[in] addr \ref BtdrvAddress
+ * @param[in] event_type AvrcEventType
+ */
+Result btdrvRegisterAudioControlNotification(BtdrvAddress addr, u32 event_type);
+
+/**
+ * @brief SendAudioControlPassthroughCommand
+ * @note Only available on [13.0.0+].
+ * @param[in] addr \ref BtdrvAddress
+ * @param[in] op_id AvrcOperationId
+ * @param[in] state_type AvrcStateType
+ */
+Result btdrvSendAudioControlPassthroughCommand(BtdrvAddress addr, u32 op_id, u32 state_type);
+
+/**
+ * @brief SendAudioControlSetAbsoluteVolumeCommand
+ * @note Only available on [13.0.0+].
+ * @param[in] addr \ref BtdrvAddress
+ * @param[in] val Input value
+ */
+Result btdrvSendAudioControlSetAbsoluteVolumeCommand(BtdrvAddress addr, s32 val);
 
 /**
  * @brief IsManufacturingMode

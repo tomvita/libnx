@@ -312,7 +312,7 @@ typedef struct {
 /// BluetoothDevicesSettings
 typedef struct {
     BtdrvAddress addr;                    ///< \ref BtdrvAddress
-    BtmBdName name;                       ///< BdName
+    BtmBdName name;                       ///< BdName. Unused on 13.0.0+
     BtmClassOfDevice class_of_device;     ///< ClassOfDevice
     u8 link_key[0x10];                    ///< LinkKey
     u8 link_key_present;                  ///< LinkKeyPresent
@@ -328,7 +328,14 @@ typedef struct {
     u8 device_type;                       ///< DeviceType
     u16 brr_size;                         ///< BrrSize
     u8 brr[0x9];                          ///< Brr
-    u8 reserved[0x12B];                   ///< Reserved
+    union {
+        u8 reserved[0x12B];               ///< Reserved [1.0.0-12.1.0]
+
+        struct {
+            u8 pad;                       ///< Padding
+            char name2[0xF9];             ///< Name
+        };                                ///< [13.0.0+]
+    };
 } SetSysBluetoothDevicesSettings;
 
 /// Structure returned by \ref setsysGetFirmwareVersion.
@@ -595,6 +602,18 @@ typedef struct {
     u8 field[4];
 } SetSysColor4u8Type;
 
+/// NxControllerLegacySettings
+typedef struct {
+    BtdrvAddress address;
+    u8 type;                            ///< \ref SetSysControllerType.
+    char serial[0x10];
+    SetSysColor4u8Type body_color;
+    SetSysColor4u8Type button_color;
+    u8 unk_x1F[8];
+    u8 unk_x27;
+    u8 interface_type;                  ///< Bitmask with \ref XcdInterfaceType.
+} SetSysNxControllerLegacySettings;
+
 /// NxControllerSettings
 typedef struct {
     BtdrvAddress address;
@@ -605,6 +624,7 @@ typedef struct {
     u8 unk_x1F[8];
     u8 unk_x27;
     u8 interface_type;                  ///< Bitmask with \ref XcdInterfaceType.
+    u8 unk_x29[0x403];                  ///< Unknown
 } SetSysNxControllerSettings;
 
 /// ConsoleSixAxisSensorAccelerationBias
@@ -1193,16 +1213,16 @@ Result setsysGetAudioOutputMode(SetSysAudioOutputModeTarget target, SetSysAudioO
 Result setsysSetAudioOutputMode(SetSysAudioOutputModeTarget target, SetSysAudioOutputMode mode);
 
 /**
- * @brief IsForceMuteOnHeadphoneRemoved
+ * @brief GetSpeakerAutoMuteFlag
  * @param[out] out Output flag.
  */
-Result setsysIsForceMuteOnHeadphoneRemoved(bool *out);
+Result setsysGetSpeakerAutoMuteFlag(bool *out);
 
 /**
- * @brief SetForceMuteOnHeadphoneRemoved
+ * @brief SetSpeakerAutoMuteFlag
  * @param[in] flag Input flag.
  */
-Result setsysSetForceMuteOnHeadphoneRemoved(bool flag);
+Result setsysSetSpeakerAutoMuteFlag(bool flag);
 
 /**
  * @brief GetQuestFlag
@@ -1513,18 +1533,20 @@ Result setsysSetAutoUpdateEnableFlag(bool flag);
 
 /**
  * @brief GetNxControllerSettings
+ * @note On [13.0.0+] \ref setsysGetNxControllerSettingsEx should be used instead.
  * @param[out] total_out Total output entries.
- * @param[out] settings Output array of \ref SetSysNxControllerSettings.
+ * @param[out] settings Output array of \ref SetSysNxControllerLegacySettings.
  * @param[in] count Size of the settings array in entries.
  */
-Result setsysGetNxControllerSettings(s32 *total_out, SetSysNxControllerSettings *settings, s32 count);
+Result setsysGetNxControllerSettings(s32 *total_out, SetSysNxControllerLegacySettings *settings, s32 count);
 
 /**
  * @brief SetNxControllerSettings
- * @param[in] settings Input array of \ref SetSysNxControllerSettings.
+ * @note On [13.0.0+] \ref setsysSetNxControllerSettingsEx should be used instead.
+ * @param[in] settings Input array of \ref SetSysNxControllerLegacySettings.
  * @param[in] count Size of the settings array in entries.
  */
-Result setsysSetNxControllerSettings(const SetSysNxControllerSettings *settings, s32 count);
+Result setsysSetNxControllerSettings(const SetSysNxControllerLegacySettings *settings, s32 count);
 
 /**
  * @brief GetBatteryPercentageFlag
@@ -2282,6 +2304,21 @@ Result setsysGetFieldTestingFlag(bool *out);
  * @param[in] flag Input flag.
  */
 Result setsysSetFieldTestingFlag(bool flag);
+
+/**
+ * @brief GetNxControllerSettingsEx
+ * @param[out] total_out Total output entries.
+ * @param[out] settings Output array of \ref SetSysNxControllerSettings.
+ * @param[in] count Size of the settings array in entries.
+ */
+Result setsysGetNxControllerSettingsEx(s32 *total_out, SetSysNxControllerSettings *settings, s32 count);
+
+/**
+ * @brief SetNxControllerSettingsEx
+ * @param[in] settings Input array of \ref SetSysNxControllerSettings.
+ * @param[in] count Size of the settings array in entries.
+ */
+Result setsysSetNxControllerSettingsEx(const SetSysNxControllerSettings *settings, s32 count);
 
 /// Initialize setcal.
 Result setcalInitialize(void);
