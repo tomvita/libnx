@@ -122,6 +122,18 @@ typedef struct {
     u8 unk_x3b[0x25];         ///< Unknown. Usually zeros?
 } FsSaveDataInfo;
 
+/// SaveDataFilter
+typedef struct {
+    bool filter_by_application_id;       ///< Filter by \ref FsSaveDataAttribute::application_id
+    bool filter_by_save_data_type;       ///< Filter by \ref FsSaveDataAttribute::save_data_type
+    bool filter_by_user_id;              ///< Filter by \ref FsSaveDataAttribute::uid
+    bool filter_by_system_save_data_id;  ///< Filter by \ref FsSaveDataAttribute::system_save_data_id
+    bool filter_by_index;                ///< Filter by \ref FsSaveDataAttribute::save_data_index
+    u8 save_data_rank;                   ///< \ref FsSaveDataRank
+    u8 padding[0x2];                     ///< Padding
+    FsSaveDataAttribute attr;            ///< \ref FsSaveDataAttribute
+} FsSaveDataFilter;
+
 typedef struct {
     u64 created;  ///< POSIX timestamp.
     u64 modified; ///< POSIX timestamp.
@@ -368,6 +380,8 @@ Result fsWriteSaveDataFileSystemExtraData(const void* buf, size_t len, FsSaveDat
 
 Result fsOpenSaveDataInfoReader(FsSaveDataInfoReader* out, FsSaveDataSpaceId save_data_space_id);
 
+Result fsOpenSaveDataInfoReaderWithFilter(FsSaveDataInfoReader* out, FsSaveDataSpaceId save_data_space_id, const FsSaveDataFilter *save_data_filter); ///< [6.0.0+]
+
 Result fsOpenImageDirectoryFileSystem(FsFileSystem* out, FsImageDirectoryId image_directory_id);
 Result fsOpenContentStorageFileSystem(FsFileSystem* out, FsContentStorageId content_storage_id);
 Result fsOpenCustomStorageFileSystem(FsFileSystem* out, FsCustomStorageId custom_storage_id); ///< [7.0.0+]
@@ -396,6 +410,9 @@ Result fsOutputAccessLogToSdCard(const char *log, size_t size);
 
 /// Only available on [7.0.0+].
 Result fsGetProgramIndexForAccessLog(u32 *out_program_index, u32 *out_program_count);
+
+// Wrapper(s) for fsCreateSaveDataFileSystem.
+Result fsCreate_TemporaryStorage(u64 application_id, u64 owner_id, s64 size, u32 flags);
 
 // Wrapper(s) for fsCreateSaveDataFileSystemBySystemSaveDataId.
 Result fsCreate_SystemSaveDataWithOwner(FsSaveDataSpaceId save_data_space_id, u64 system_save_data_id, AccountUid uid, u64 owner_id, s64 size, s64 journal_size, u32 flags);

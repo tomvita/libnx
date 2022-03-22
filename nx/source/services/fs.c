@@ -434,6 +434,19 @@ Result fsOpenSaveDataInfoReader(FsSaveDataInfoReader* out, FsSaveDataSpaceId sav
     }
 }
 
+Result fsOpenSaveDataInfoReaderWithFilter(FsSaveDataInfoReader* out, FsSaveDataSpaceId save_data_space_id, const FsSaveDataFilter *save_data_filter) {
+    const struct {
+        u8 save_data_space_id;
+        u8 pad[7];
+        FsSaveDataFilter save_data_filter;
+    } in = { (u8)save_data_space_id, {0}, *save_data_filter };
+
+    return _fsObjectDispatchIn(&g_fsSrv, 68, in,
+        .out_num_objects = 1,
+        .out_objects = &out->s,
+    );
+}
+
 Result fsOpenImageDirectoryFileSystem(FsFileSystem* out, FsImageDirectoryId image_directory_id) {
     u32 tmp=image_directory_id;
     return _fsObjectDispatchIn(&g_fsSrv, 100, tmp,
@@ -581,6 +594,25 @@ Result fsGetProgramIndexForAccessLog(u32 *out_program_index, u32 *out_program_co
     return rc;
 }
 
+// Wrapper(s) for fsCreateSaveDataFileSystem.
+Result fsCreate_TemporaryStorage(u64 application_id, u64 owner_id, s64 size, u32 flags) {
+    FsSaveDataAttribute attr = {
+        .application_id = application_id,
+        .save_data_type = FsSaveDataType_Temporary,
+    };
+    FsSaveDataCreationInfo create = {
+        .save_data_size = size,
+        .journal_size = 0,
+        .available_size = 0x4000,
+        .owner_id = owner_id,
+        .flags = flags,
+        .save_data_space_id = FsSaveDataSpaceId_Temporary,
+    };
+    FsSaveDataMetaInfo meta={};
+
+    return fsCreateSaveDataFileSystem(&attr, &create, &meta);
+}
+
 // Wrapper(s) for fsCreateSaveDataFileSystemBySystemSaveDataId.
 Result fsCreate_SystemSaveDataWithOwner(FsSaveDataSpaceId save_data_space_id, u64 system_save_data_id, AccountUid uid, u64 owner_id, s64 size, s64 journal_size, u32 flags) {
     FsSaveDataAttribute attr = {
@@ -655,7 +687,7 @@ Result fsOpen_TemporaryStorage(FsFileSystem* out) {
     memset(&attr, 0, sizeof(attr));
     attr.save_data_type = FsSaveDataType_Temporary;
 
-    return fsOpenSaveDataFileSystem(out, FsSaveDataType_Temporary, &attr);
+    return fsOpenSaveDataFileSystem(out, FsSaveDataSpaceId_Temporary, &attr);
 }
 
 Result fsOpen_CacheStorage(FsFileSystem* out, u64 application_id, u16 save_data_index) {

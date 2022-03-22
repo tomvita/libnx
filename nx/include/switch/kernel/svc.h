@@ -91,8 +91,8 @@ typedef struct {
     u32 type;            ///< Memory type (see lower 8 bits of \ref MemoryState).
     u32 attr;            ///< Memory attributes (see \ref MemoryAttribute).
     u32 perm;            ///< Memory permissions (see \ref Permission).
-    u32 device_refcount; ///< Device reference count.
     u32 ipc_refcount;    ///< IPC reference count.
+    u32 device_refcount; ///< Device reference count.
     u32 padding;         ///< Padding.
 } MemoryInfo;
 
@@ -1561,10 +1561,9 @@ Result svcSetResourceLimitLimitValue(Handle reslimit, LimitableResource which, u
 /**
  * @brief Calls a secure monitor function (TrustZone, EL3).
  * @param regs Arguments to pass to the secure monitor.
- * @return Return value from the secure monitor.
  * @note Syscall number 0x7F.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-u64 svcCallSecureMonitor(SecmonArgs* regs);
+void svcCallSecureMonitor(SecmonArgs* regs);
 
 ///@}
