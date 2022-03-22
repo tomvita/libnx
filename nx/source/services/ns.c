@@ -2371,7 +2371,7 @@ Result nsdevIsSystemMemoryResourceLimitBoosted(bool* out) {
 }
 
 Result nsdevGetRunningApplicationProcessIdForDevelop(u64* out_pid) {
-    if (hosversionBefore(6,0,0)) return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    // if (hosversionBefore(6,0,0)) return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _nsCmdNoInOutU64(&g_nsdevSrv, out_pid, 11);
 }
