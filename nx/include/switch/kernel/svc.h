@@ -40,6 +40,8 @@ typedef enum {
     MemType_KernelStack=0x13,         ///< Mapped in kernel during \ref svcCreateThread.
     MemType_CodeReadOnly=0x14,        ///< Mapped in kernel during \ref svcControlCodeMemory.
     MemType_CodeWritable=0x15,        ///< Mapped in kernel during \ref svcControlCodeMemory.
+    MemType_Coverage=0x16,            ///< Not available.
+    MemType_Insecure=0x17,            ///< Mapped in kernel during \ref svcMapInsecureMemory.
 } MemoryType;
 
 /// Memory state bitmasks.
@@ -1162,7 +1164,7 @@ Result svcDetachDeviceAddressSpace(u64 device, Handle handle);
  * @note Syscall number 0x59.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcMapDeviceAddressSpaceByForce(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 perm);
+Result svcMapDeviceAddressSpaceByForce(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 option);
 
 /**
  * @brief Maps an attached device address space to an userspace address.
@@ -1171,7 +1173,7 @@ Result svcMapDeviceAddressSpaceByForce(Handle handle, Handle proc_handle, u64 ma
  * @note Syscall number 0x5A.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcMapDeviceAddressSpaceAligned(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 perm);
+Result svcMapDeviceAddressSpaceAligned(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 option);
 
 /**
  * @brief Maps an attached device address space to an userspace address. [1.0.0-12.1.0]
@@ -1566,5 +1568,24 @@ Result svcSetResourceLimitLimitValue(Handle reslimit, LimitableResource which, u
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
 void svcCallSecureMonitor(SecmonArgs* regs);
+
+///@}
+
+///@name Memory management
+///@{
+
+/**
+ * @brief Maps new insecure memory at the desired address. [15.0.0+]
+ * @return Result code.
+ * @note Syscall number 0x90.
+ */
+Result svcMapInsecureMemory(void *address, u64 size);
+
+/**
+ * @brief Undoes the effects of \ref svcMapInsecureMemory. [15.0.0+]
+ * @return Result code.
+ * @note Syscall number 0x91.
+ */
+Result svcUnmapInsecureMemory(void *address, u64 size);
 
 ///@}
