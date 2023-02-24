@@ -17,6 +17,7 @@ typedef enum {
     AudioTarget_Headphone = 2,
     AudioTarget_Tv = 3,
     AudioTarget_UsbOutputDevice = 4,
+    AudioTarget_Bluetooth = 5,
 } AudioTarget;
 
 typedef enum {
@@ -41,10 +42,10 @@ Result audctlInitialize(void);
 void audctlExit(void);
 Service* audctlGetServiceSession(void);
 
-Result audctlGetTargetVolume(float* volume_out, AudioTarget target);
-Result audctlSetTargetVolume(AudioTarget target, float volume);
-Result audctlGetTargetVolumeMin(float* volume_out);
-Result audctlGetTargetVolumeMax(float* volume_out);
+Result audctlGetTargetVolume(s32* volume_out, AudioTarget target);
+Result audctlSetTargetVolume(AudioTarget target, s32 volume);
+Result audctlGetTargetVolumeMin(s32* volume_out);
+Result audctlGetTargetVolumeMax(s32* volume_out);
 Result audctlIsTargetMute(bool* mute_out, AudioTarget target);
 Result audctlSetTargetMute(AudioTarget target, bool mute);
 Result audctlIsTargetConnected(bool* connected_out, AudioTarget target);
@@ -66,3 +67,4 @@ Result audctlGetAudioOutputTargetForPlayReport(AudioTarget* target_out); ///< [3
 Result audctlNotifyHeadphoneVolumeWarningDisplayedEvent(void); ///< [3.0.0+]
 Result audctlSetSystemOutputMasterVolume(float volume); ///< [4.0.0+]
 Result audctlGetSystemOutputMasterVolume(float* volume_out); ///< [4.0.0+]
+Result audctlGetActiveOutputTarget(AudioTarget* target);
