@@ -8,12 +8,19 @@
 #include "../types.h"
 #include "../sf/service.h"
 
+/// Values for __nx_ssl_service_type, controls which ssl service to initialize.
+typedef enum {
+    SslServiceType_Default = 0,    ///< Initialize the ssl service.
+    SslServiceType_System  = 1,    ///< [15.0.0+] Initialize the ssl:s service. On older versions this is the same as ::SslServiceType_Default.
+} SslServiceType;
+
 /// CaCertificateId
 typedef enum {
     SslCaCertificateId_All                                                    =   -1,            ///< [3.0.0+] All
 
     SslCaCertificateId_NintendoCAG3                                           =    1,            ///< NintendoCAG3
     SslCaCertificateId_NintendoClass2CAG3                                     =    2,            ///< NintendoClass2CAG3
+    SslCaCertificateId_NintendoRootCAG4                                       =    3,            ///< [16.0.0+] "Nintendo Root CA G4"
 
     SslCaCertificateId_AmazonRootCA1                                          = 1000,            ///< AmazonRootCA1
     SslCaCertificateId_StarfieldServicesRootCertificateAuthorityG2            = 1001,            ///< StarfieldServicesRootCertificateAuthorityG2
@@ -49,6 +56,32 @@ typedef enum {
     SslCaCertificateId_VeriSignClass3PublicPrimaryCertificationAuthorityG5    = 1031,            ///< VeriSignClass3PublicPrimaryCertificationAuthorityG5 ([8.0.0+] ::SslTrustedCertStatus is ::SslTrustedCertStatus_EnabledNotTrusted)
     SslCaCertificateId_VeriSignUniversalRootCertificationAuthority            = 1032,            ///< VeriSignUniversalRootCertificationAuthority ([8.0.0+] ::SslTrustedCertStatus is ::SslTrustedCertStatus_EnabledNotTrusted)
     SslCaCertificateId_DSTRootCAX3                                            = 1033,            ///< [6.0.0+] DSTRootCAX3
+    SslCaCertificateId_USERTrustRsaCertificationAuthority                     = 1034,            ///< [10.0.3+] "USERTrust RSA Certification Authority"
+    SslCaCertificateId_ISRGRootX10                                            = 1035,            ///< [10.1.0+] "ISRG Root X10"
+    SslCaCertificateId_USERTrustEccCertificationAuthority                     = 1036,            ///< [10.1.0+] "USERTrust ECC Certification Authority"
+    SslCaCertificateId_COMODORsaCertificationAuthority                        = 1037,            ///< [10.1.0+] "COMODO RSA Certification Authority"
+    SslCaCertificateId_COMODOEccCertificationAuthority                        = 1038,            ///< [10.1.0+] "COMODO ECC Certification Authority"
+    SslCaCertificateId_AmazonRootCA2                                          = 1039,            ///< [11.0.0+] "Amazon Root CA 2"
+    SslCaCertificateId_AmazonRootCA3                                          = 1040,            ///< [11.0.0+] "Amazon Root CA 3"
+    SslCaCertificateId_AmazonRootCA4                                          = 1041,            ///< [11.0.0+] "Amazon Root CA 4"
+    SslCaCertificateId_DigiCertAssuredIDRootG3                                = 1042,            ///< [11.0.0+] "DigiCert Assured ID Root G3"
+    SslCaCertificateId_DigiCertGlobalRootG3                                   = 1043,            ///< [11.0.0+] "DigiCert Global Root G3"
+    SslCaCertificateId_DigiCertTrustedRootG4                                  = 1044,            ///< [11.0.0+] "DigiCert Trusted Root G4"
+    SslCaCertificateId_EntrustRootCertificationAuthorityEC1                   = 1045,            ///< [11.0.0+] "Entrust Root Certification Authority - EC1"
+    SslCaCertificateId_EntrustRootCertificationAuthorityG4                    = 1046,            ///< [11.0.0+] "Entrust Root Certification Authority - G4"
+    SslCaCertificateId_GlobalSignECCRootCAR4                                  = 1047,            ///< [11.0.0+] "GlobalSign ECC Root CA - R4"
+    SslCaCertificateId_GlobalSignECCRootCAR5                                  = 1048,            ///< [11.0.0+] "GlobalSign ECC Root CA - R5"
+    SslCaCertificateId_GlobalSignECCRootCAR6                                  = 1049,            ///< [11.0.0+] "GlobalSign ECC Root CA - R6"
+    SslCaCertificateId_GTSRootR1                                              = 1050,            ///< [11.0.0+] "GTS Root R1"
+    SslCaCertificateId_GTSRootR2                                              = 1051,            ///< [11.0.0+] "GTS Root R2"
+    SslCaCertificateId_GTSRootR3                                              = 1052,            ///< [11.0.0+] "GTS Root R3"
+    SslCaCertificateId_GTSRootR4                                              = 1053,            ///< [11.0.0+] "GTS Root R4"
+    SslCaCertificateId_SecurityCommunicationRootCA                            = 1054,            ///< [12.0.0+] "Security Communication RootCA"
+    SslCaCertificateId_GlobalSignRootE4                                       = 1055,            ///< [15.0.0+] "GlobalSign Root E4"
+    SslCaCertificateId_GlobalSignRootR4                                       = 1056,            ///< [15.0.0+] "GlobalSign Root R4"
+    SslCaCertificateId_TTeleSecGlobalRootClass2                               = 1057,            ///< [15.0.0+] "T-TeleSec GlobalRoot Class 2"
+    SslCaCertificateId_DigiCertTLSECCP384RootG5                               = 1058,            ///< [16.0.0+] "DigiCert TLS ECC P384 Root G5"
+    SslCaCertificateId_DigiCertTLSRSA4096RootG5                               = 1059,            ///< [16.0.0+] "DigiCert TLS RSA4096 Root G5"
 } SslCaCertificateId;
 
 /// TrustedCertStatus
@@ -144,6 +177,11 @@ typedef enum {
     SslOptionType_EnableAlpn                                                  = 3,               ///< [9.0.0+] EnableAlpn. Only available with \ref sslConnectionSetOption. \ref sslConnectionSetSocketDescriptor should have been used prior to this - this will optionally use state setup by that, without throwing an error if that cmd wasn't used.
 } SslOptionType;
 
+/// PrivateOptionType
+typedef enum {
+    SslPrivateOptionType_DtlsSession                                          = 1,               ///< \ref sslConnectionSetSessionCacheMode will throw an error if the input ::SslSessionCacheMode is non-zero and this option flag is set.
+} SslPrivateOptionType;
+
 /// AlpnProtoState
 typedef enum {
     SslAlpnProtoState_NoSupport                                               = 0,               ///< NoSupport
@@ -189,6 +227,15 @@ typedef struct {
     char cipher[0x40];                          ///< Cipher string.
     char protocol_version[0x8];                 ///< Protocol version string.
 } SslCipherInfo;
+
+/// KeyAndCertParams
+typedef struct {
+    u32 unk_x0;                                 ///< Must be value 1.
+    s32 key_size;                               ///< Key size in bits.
+    u64 public_exponent;                        ///< Public exponent, must be non-zero. Only the low 4-bytes are used.
+    char common_name[0x40];                     ///< CN (Common Name) NUL-terminated string.
+    u32 common_name_len;                        ///< Length of common_name excluding NUL-terminator. Must be 0x1-0x3F.
+} SslKeyAndCertParams;
 
 /// Initialize ssl. A default value of 0x3 can be used for num_sessions. This must be 0x1-0x4.
 Result sslInitialize(u32 num_sessions);
@@ -260,6 +307,26 @@ Result sslSetDebugOption(const void* buffer, size_t size, SslDebugOptionType typ
  * @param[in] type \ref SslDebugOptionType
  */
 Result sslGetDebugOption(void* buffer, size_t size, SslDebugOptionType type);
+
+/**
+ * @brief ClearTls12FallbackFlag
+ * @note Only available on [14.0.0+].
+ */
+Result sslClearTls12FallbackFlag(void);
+
+/**
+ * @brief SetThreadCoreMask
+ * @param[in] mask CoreMask
+ * @note Only available on [15.0.0+] with ::SslServiceType_System.
+ */
+Result sslSetThreadCoreMask(u64 mask);
+
+/**
+ * @brief GetThreadCoreMask
+ * @param[out] out Output CoreMask.
+ * @note Only available on [15.0.0+] with ::SslServiceType_System.
+ */
+Result sslGetThreadCoreMask(u64 *out);
 
 ///@name ISslContext
 ///@{
@@ -359,6 +426,42 @@ Result sslContextAddPolicyOid(SslContext *c, const char *str, u32 str_bufsize);
  * @param[out] id Output Id. Optional, can be NULL.
  */
 Result sslContextImportCrl(SslContext *c, const void* buffer, u32 size, u64 *id);
+
+/**
+ * @brief ImportClientCertKeyPki
+ * @note Only available on [16.0.0+].
+ * @param c \ref SslContext
+ * @param[in] cert Input cert buffer,
+ * @param[in] cert_size Size of the cert buffer.
+ * @param[in] key Input key buffer.
+ * @param[in] key_size Size of the key buffer.
+ * @param[in] format \ref SslCertificateFormat for the cert and key.
+ * @param[out] id Output Id. Optional, can be NULL.
+ */
+Result sslContextImportClientCertKeyPki(SslContext *c, const void* cert, u32 cert_size, const void* key, u32 key_size, SslCertificateFormat format, u64 *id);
+
+/**
+ * @brief GeneratePrivateKeyAndCert
+ * @note Only available on [16.0.0+].
+ * @param c \ref SslContext
+ * @param[out] cert Output cert buffer,
+ * @param[in] cert_size Size of the cert buffer.
+ * @param[out] key Output key buffer.
+ * @param[in] key_size Size of the key buffer.
+ * @param[in] val Must be value 1.
+ * @param[in] params \ref SslKeyAndCertParams
+ * @param[out] out_certsize Actual size of the generated cert data.
+ * @param[out] out_keysize Actual size of the generated key data.
+ */
+Result sslContextGeneratePrivateKeyAndCert(SslContext *c, void* cert, u32 cert_size, void* key, u32 key_size, u32 val, const SslKeyAndCertParams *params, u32 *out_certsize, u32 *out_keysize);
+
+/**
+ * @brief CreateConnectionForSystem
+ * @note Only available on [15.0.0+] with ::SslServiceType_System.
+ * @param c \ref SslContext
+ * @param[out] conn Output \ref SslConnection.
+ */
+Result sslContextCreateConnectionForSystem(SslContext *c, SslConnection *conn);
 
 ///@}
 
@@ -618,6 +721,81 @@ Result sslConnectionSetNextAlpnProto(SslConnection *c, const u8 *buffer, u32 siz
  * @param[in] size Output buffer size, must not be 0.
  */
 Result sslConnectionGetNextAlpnProto(SslConnection *c, SslAlpnProtoState *state, u32 *out, u8 *buffer, u32 size);
+
+/**
+ * @brief SetDtlsSocketDescriptor. Do not use directly, use \ref socketSslConnectionSetDtlsSocketDescriptor instead.
+ * @note Only available on [16.0.0+].
+ * @note An error is thrown if this was used previously.
+ * @param c \ref SslConnection
+ * @param[in] sockfd sockfd
+ * @param[in] Input sockaddr.
+ * @param[in] size Input sockaddr size.
+ * @param[out] out_sockfd sockfd. Prior to using \ref sslConnectionClose, this must be closed if it's not negative (it will be -1 if ::SslOptionType_DoNotCloseSocket is set).
+ */
+Result sslConnectionSetDtlsSocketDescriptor(SslConnection *c, int sockfd, const void* buf, size_t size, int *out_sockfd);
+
+/**
+ * @brief GetDtlsHandshakeTimeout
+ * @note Only available on [16.0.0+].
+ * @param c \ref SslConnection
+ * @param[out] out Output nanoseconds value.
+ */
+Result sslConnectionGetDtlsHandshakeTimeout(SslConnection *c, u64 *out);
+
+/**
+ * @brief SetPrivateOption
+ * @note Only available on [16.0.0+].
+ * @param c \ref SslConnection
+ * @param[in] option \ref SslPrivateOptionType
+ * @param[in] flag Input flag value.
+ */
+Result sslConnectionSetPrivateOption(SslConnection *c, SslPrivateOptionType option, bool flag);
+
+/**
+ * @brief SetSrtpCiphers
+ * @note Only available on [16.0.0+].
+ * @param c \ref SslConnection
+ * @param[in] ciphers Input array of u16s. Each entry must be value 1-2, otherwise the entry is ignored.
+ * @param[in] count Total entries in the ciphers array, the maximum is 4.
+ */
+Result sslConnectionSetSrtpCiphers(SslConnection *c, const u16 *ciphers, u32 count);
+
+/**
+ * @brief GetSrtpCipher
+ * @note Only available on [16.0.0+].
+ * @param c \ref SslConnection
+ * @param[out] out Output value.
+ */
+Result sslConnectionGetSrtpCipher(SslConnection *c, u16 *out);
+
+/**
+ * @brief ExportKeyingMaterial
+ * @note Only available on [16.0.0+].
+ * @param c \ref SslConnection
+ * @param[out] outbuf Output buffer.
+ * @param[in] outbuf_size Output buffer size.
+ * @param[in] label Input label string.
+ * @param[in] label_size Size of the label buffer excluding NUL-terminator.
+ * @param[in] context Optional input context buffer, can be NULL.
+ * @param[in] context_size Size of context, if specified this must be <0xFFFF.
+ */
+Result sslConnectionExportKeyingMaterial(SslConnection *c, u8 *outbuf, u32 outbuf_size, const char *label, u32 label_size, const void* context, u32 context_size);
+
+/**
+ * @brief SetIoTimeout
+ * @note Only available on [16.0.0+].
+ * @param c \ref SslConnection
+ * @param[in] timeout Input timeout value.
+ */
+Result sslConnectionSetIoTimeout(SslConnection *c, u32 timeout);
+
+/**
+ * @brief GetIoTimeout
+ * @note Only available on [16.0.0+].
+ * @param c \ref SslConnection
+ * @param[out] out Output timeout value.
+ */
+Result sslConnectionGetIoTimeout(SslConnection *c, u32 *out);
 
 ///@}
 
