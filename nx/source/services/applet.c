@@ -1722,7 +1722,7 @@ bool appletHolderCheckFinished(AppletHolder *h) {
     return R_SUCCEEDED(eventWait(&h->StateChangedEvent, 0));
 }
 
-u32 appletHolderGetExitReason(AppletHolder *h) {
+LibAppletExitReason appletHolderGetExitReason(AppletHolder *h) {
     return h->exitreason;
 }
 
@@ -2986,6 +2986,10 @@ AppletFocusState appletGetFocusState(void) {
 AppletInfo *appletGetAppletInfo(void) {
     if (!g_appletInfoInitialized) return NULL;
     return &g_appletInfo;
+}
+
+Event *appletGetMessageEvent(void) {
+    return &g_appletMessageEvent;
 }
 
 Result appletGetMessage(u32 *msg) {

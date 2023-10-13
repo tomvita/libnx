@@ -1,5 +1,68 @@
 # Changelog
 
+## Version 4.4.2
+
+#### system
+* ensure correct addresses for bss
+
+#### miscellaneous
+* fix timezone to allow +/- and alphanumrics
+* end compile_commmands generation when elf linked
+
+## Version 4.4.1
+
+#### miscellaneous
+* add missing separator to local path 
+
+**Several issues were fixed, and usability and stability were improved.**
+
+## Version 4.4.0
+
+#### services
+* applet: add appletGetMessageEvent
+* usbcomms: add async API
+* usbcomms: expose VID:PID configuration
+
+#### miscellaneous
+* correct problems revealed by gcc 13
+* mitigate race condition bug in nvservices
+
+**Several issues were fixed, and usability and stability were improved.**
+
+## Version 4.3.0
+
+#### services
+* applet: Updated for [15.0.0+]. Added `__nx_applet_init_timeout`
+* audctl:
+    * Added audctlGetActiveOutputTarget.
+    * Fixed TargetVolume functions.
+* auddev: Added auddevGetActiveAudioDeviceName.
+* bpc: Fixed GetSleepButtonState/GetPowerButton.
+* fs: Updated for [16.0.0+]
+* hiddbg: Changed hiddbgAttachHdlsWorkBuffer to accept a user-supplied buffer and size.
+* ncm: Updated for [15.0.0+] and [16.0.0+].
+* pdm:
+    * Updated for [16.0.0+].
+    * Fixed pdmqryQueryAccountEvent on older sysvers.
+    * Updated structs.
+* pl: Added [16.0.0+] sysver checks.
+* ssl:
+    * Added support for new [16.0.0+] functionality.
+    * Added ssl:s support [15.0.0+].
+    * Added sslClearTls12FallbackFlag [14.0.0+].
+    * Updated SslCaCertificateId enum.
+* usbhs: Added the remaining cmds and expose more functionality.
+* vi: Added [16.0.0+] Manager commands.
+* wlaninf: Added sysver check to account for its removal in \[15.0.0+\].
+
+#### devices
+* nxlinkConnectToHost: Added timeout to avoid long hang when -s isn't specified for nxlink.
+
+#### miscellaneous
+* Added CMSG macros to BSD headers.
+
+**Several issues were fixed, and usability and stability were improved.**
+
 ## Version 4.2.2
 
 #### system

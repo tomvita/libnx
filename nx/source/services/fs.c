@@ -60,13 +60,17 @@ NX_INLINE Result _fsObjectDispatchImpl(
     _fsObjectDispatchImpl((_s),(_rid),NULL,0,NULL,0,(SfDispatchParams){ __VA_ARGS__ })
 
 #define _fsObjectDispatchIn(_s,_rid,_in,...) \
-    _fsObjectDispatchImpl((_s),(_rid),&(_in),sizeof(_in),NULL,0,(SfDispatchParams){ __VA_ARGS__ })
+    ({ _Static_assert(!(serviceMacroDetectIsPointer(_in))); \
+    _fsObjectDispatchImpl((_s),(_rid),&(_in),sizeof(_in),NULL,0,(SfDispatchParams){ __VA_ARGS__ }); })
 
 #define _fsObjectDispatchOut(_s,_rid,_out,...) \
-    _fsObjectDispatchImpl((_s),(_rid),NULL,0,&(_out),sizeof(_out),(SfDispatchParams){ __VA_ARGS__ })
+    ({ _Static_assert(!(serviceMacroDetectIsPointer(_out))); \
+    _fsObjectDispatchImpl((_s),(_rid),NULL,0,&(_out),sizeof(_out),(SfDispatchParams){ __VA_ARGS__ }); })
 
 #define _fsObjectDispatchInOut(_s,_rid,_in,_out,...) \
-    _fsObjectDispatchImpl((_s),(_rid),&(_in),sizeof(_in),&(_out),sizeof(_out),(SfDispatchParams){ __VA_ARGS__ })
+    ({ _Static_assert(!(serviceMacroDetectIsPointer(_in))); \
+    _Static_assert(!(serviceMacroDetectIsPointer(_out))); \
+    _fsObjectDispatchImpl((_s),(_rid),&(_in),sizeof(_in),&(_out),sizeof(_out),(SfDispatchParams){ __VA_ARGS__ }); })
 
 NX_GENERATE_SERVICE_GUARD(fs);
 
@@ -133,7 +137,7 @@ static Result _fsCmdNoInOutBool(Service* srv, bool *out, u32 cmd_id) {
 //-----------------------------------------------------------------------------
 
 Result fsOpenFileSystem(FsFileSystem* out, FsFileSystemType fsType, const char* contentPath) {
-    return fsOpenFileSystemWithId(out, 0, fsType, contentPath);
+    return fsOpenFileSystemWithId(out, 0, fsType, contentPath, FsContentAttributes_None);
 }
 
 static Result _fsOpenFileSystem(FsFileSystem* out, FsFileSystemType fsType, const char* contentPath) {
@@ -165,18 +169,33 @@ Result fsOpenFileSystemWithPatch(FsFileSystem* out, u64 id, FsFileSystemType fsT
     );
 }
 
-static Result _fsOpenFileSystemWithId(FsFileSystem* out, u64 id, FsFileSystemType fsType, const char* contentPath) {
-    const struct {
-        u32 fsType;
-        u64 id;
-    } in = { fsType, id };
+static Result _fsOpenFileSystemWithId(FsFileSystem* out, u64 id, FsFileSystemType fsType, const char* contentPath, FsContentAttributes attr) {
+    if (hosversionAtLeast(16,0,0)) {
+        const struct {
+            u8 attr;
+            u32 fsType;
+            u64 id;
+        } in = { attr, fsType, id };
 
-    return _fsObjectDispatchIn(&g_fsSrv, 8, in,
-        .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
-        .buffers = { { contentPath, FS_MAX_PATH } },
-        .out_num_objects = 1,
-        .out_objects = &out->s,
-    );
+        return _fsObjectDispatchIn(&g_fsSrv, 10, in,
+            .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
+            .buffers = { { contentPath, FS_MAX_PATH } },
+            .out_num_objects = 1,
+            .out_objects = &out->s,
+        );
+    } else {
+        const struct {
+            u32 fsType;
+            u64 id;
+        } in = { fsType, id };
+
+        return _fsObjectDispatchIn(&g_fsSrv, 8, in,
+            .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
+            .buffers = { { contentPath, FS_MAX_PATH } },
+            .out_num_objects = 1,
+            .out_objects = &out->s,
+        );
+    }
 }
 
 Result fsOpenDataFileSystemByProgramId(FsFileSystem *out, u64 program_id) {
@@ -189,12 +208,12 @@ Result fsOpenDataFileSystemByProgramId(FsFileSystem *out, u64 program_id) {
     );
 }
 
-Result fsOpenFileSystemWithId(FsFileSystem* out, u64 id, FsFileSystemType fsType, const char* contentPath) {
+Result fsOpenFileSystemWithId(FsFileSystem* out, u64 id, FsFileSystemType fsType, const char* contentPath, FsContentAttributes attr) {
     char sendStr[FS_MAX_PATH] = {0};
     strncpy(sendStr, contentPath, sizeof(sendStr)-1);
 
     if (hosversionAtLeast(2,0,0))
-        return _fsOpenFileSystemWithId(out, id, fsType, sendStr);
+        return _fsOpenFileSystemWithId(out, id, fsType, sendStr, attr);
     else
         return _fsOpenFileSystem(out, fsType, sendStr);
 }
@@ -520,7 +539,7 @@ Result fsIsSignedSystemPartitionOnSdCardValid(bool *out) {
 }
 
 Result fsGetRightsIdByPath(const char* path, FsRightsId* out_rights_id) {
-    if (hosversionBefore(2,0,0))
+    if (!hosversionBetween(2, 16))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     char send_path[FS_MAX_PATH] = {0};
@@ -532,12 +551,14 @@ Result fsGetRightsIdByPath(const char* path, FsRightsId* out_rights_id) {
     );
 }
 
-Result fsGetRightsIdAndKeyGenerationByPath(const char* path, u8* out_key_generation, FsRightsId* out_rights_id) {
+Result fsGetRightsIdAndKeyGenerationByPath(const char* path, FsContentAttributes attr, u8* out_key_generation, FsRightsId* out_rights_id) {
     if (hosversionBefore(3,0,0))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     char send_path[FS_MAX_PATH] = {0};
     strncpy(send_path, path, FS_MAX_PATH-1);
+
+    const u8 in = attr;
 
     struct {
         u8 key_generation;
@@ -545,10 +566,18 @@ Result fsGetRightsIdAndKeyGenerationByPath(const char* path, u8* out_key_generat
         FsRightsId rights_id;
     } out;
 
-    Result rc = _fsObjectDispatchOut(&g_fsSrv, 610, out,
-        .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
-        .buffers = { { send_path, sizeof(send_path) } },
-    );
+    Result rc;
+    if (hosversionAtLeast(16,0,0)) {
+        rc = _fsObjectDispatchInOut(&g_fsSrv, 610, in, out,
+            .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
+            .buffers = { { send_path, sizeof(send_path) } },
+        );
+    } else {
+        rc = _fsObjectDispatchOut(&g_fsSrv, 610, out,
+            .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
+            .buffers = { { send_path, sizeof(send_path) } },
+        );
+    }
 
     if (R_SUCCEEDED(rc)) {
         if (out_key_generation) *out_key_generation = out.key_generation;
