@@ -1,5 +1,211 @@
 # Changelog
 
+## Version 4.7.0
+
+#### system
+* Basic support for 18.0.0
+
+#### services
+* fs: add GetFileSystemAttribute cmd
+* fs: Implement "ChallengeCardExistence" and "GetGameCardDeviceCertificate"
+
+#### graphics
+* nvchannel: Fix SET_CLK_RATE, implement GET_CLK_RATE and SET_SUBMIT_TIMEOUT
+
+#### miscellaneous
+* Update SetSysProductModel_Aula comment
+
+## Version 4.6.0
+
+#### system
+* svc: fix query/insecure names
+
+#### miscellaneous
+* add fsDeviceOperatorGetGameCardUpdatePartitionInfo
+* Add NX_ prefix to PACKED, NORETURN, IGNORE_ARG and DEPRECATED macros
+* Fix: avoid segfault at static destructors
+
+## Version 4.5.0
+
+#### services
+* btdrv: Missing definitions for ble were added
+* capsdc: Updated for [17.0.0+]
+* hidsys: Support was added for many commands
+* fs:
+    * Updated for [17.0.0+]
+    * Support was added for many fsDeviceOperator commands
+* ncm: Updated for [17.0.0+]
+* nfc: Support was added for all remaining commands
+* ns: Added nsEstimateSizeToMove
+* pctl: Support was added for many commands
+* ssl: Updated sslConnectionSetPrivateOption for [17.0.0+]
+* ts: Updated for [17.0.0+]
+
+#### devices
+* socket: Updated wrapper to automatically select latest available bsd service version (fixes multicast support)
+
+#### miscellaneous
+* The linker script/crt0 were updated to support relro
+* A bug was fixed in aes-cbc block decryption
+* A number of problems were corrected involving incorrect ipc serialization with pointer arguments
+
+**Several issues were fixed, and usability and stability were improved.**
+
+## Version 4.4.2
+
+#### system
+* ensure correct addresses for bss
+
+#### miscellaneous
+* fix timezone to allow +/- and alphanumrics
+* end compile_commmands generation when elf linked
+
+## Version 4.4.1
+
+#### miscellaneous
+* add missing separator to local path
+
+**Several issues were fixed, and usability and stability were improved.**
+
+## Version 4.4.0
+
+#### services
+* applet: add appletGetMessageEvent
+* usbcomms: add async API
+* usbcomms: expose VID:PID configuration
+
+#### miscellaneous
+* correct problems revealed by gcc 13
+* mitigate race condition bug in nvservices
+
+**Several issues were fixed, and usability and stability were improved.**
+
+## Version 4.3.0
+
+#### services
+* applet: Updated for [15.0.0+]. Added `__nx_applet_init_timeout`
+* audctl:
+    * Added audctlGetActiveOutputTarget.
+    * Fixed TargetVolume functions.
+* auddev: Added auddevGetActiveAudioDeviceName.
+* bpc: Fixed GetSleepButtonState/GetPowerButton.
+* fs: Updated for [16.0.0+]
+* hiddbg: Changed hiddbgAttachHdlsWorkBuffer to accept a user-supplied buffer and size.
+* ncm: Updated for [15.0.0+] and [16.0.0+].
+* pdm:
+    * Updated for [16.0.0+].
+    * Fixed pdmqryQueryAccountEvent on older sysvers.
+    * Updated structs.
+* pl: Added [16.0.0+] sysver checks.
+* ssl:
+    * Added support for new [16.0.0+] functionality.
+    * Added ssl:s support [15.0.0+].
+    * Added sslClearTls12FallbackFlag [14.0.0+].
+    * Updated SslCaCertificateId enum.
+* usbhs: Added the remaining cmds and expose more functionality.
+* vi: Added [16.0.0+] Manager commands.
+* wlaninf: Added sysver check to account for its removal in \[15.0.0+\].
+
+#### devices
+* nxlinkConnectToHost: Added timeout to avoid long hang when -s isn't specified for nxlink.
+
+#### miscellaneous
+* Added CMSG macros to BSD headers.
+
+**Several issues were fixed, and usability and stability were improved.**
+
+## Version 4.2.2
+
+#### system
+* svc: Added svcMapInsecureMemory, svcUnmapInsecureMemory [15.0.0+].
+* svc: Renamed perm parameter of svcMapDeviceAddressSpaceByForce and svcMapDeviceAddressSpaceAligned to option [15.0.0+].
+* svc: Corrected svcMapIoRegion, svcUnmapIoRegion.
+* env: Added HBABI support for hinting SVCs in the extended range 0x80..0xBF.
+* cache: Added instruction barrier to armICacheInvalidate.
+
+#### graphics
+* Added nvGpuGetTimestamp, nvioctlNvhostCtrlGpu_GetGpuTime.
+
+#### applets
+* swkbd: Corrected several typos and incorrect floating point values.
+
+#### network
+* socket: Added socketNifmRequestRegisterSocketDescriptor, socketNifmRequestUnregisterSocketDescriptor.
+* nifm: nifmRequestSetKeptInSleep, nifmRequestRegisterSocketDescriptor, nifmRequestUnregisterSocketDescriptor, nifmSetWowlDelayedWakeTime.
+
+#### other services
+* set:sys: setsysNeedsToUpdateHeadphoneVolume removed in [15.0.0].
+* pdm:qry: pdmqryQueryRecentlyPlayedApplication, pdmqryGetRecentlyPlayedApplicationUpdateEvent removed in [15.0.0].
+
+Several issues were fixed, and usability and stability were improved.
+
+## Version 4.2.1
+
+#### system
+* cache: Adjusted cache maintenance ABI for [14.0.0+].
+* svc: Added InfoType_IsSvcPermitted [14.0.0+].
+* svc: Removed svcCallSecureMonitor's non-existent return type.
+* svc: Fixed definition of MemoryInfo struct.
+* ldscript: Generated ELFs now start with the `.text` section (required by GDB).
+
+#### filesystem
+* Added fsOpenSaveDataInfoReaderWithFilter.
+* Added fsCreate_TemporaryStorage.
+* Fixed bug in fsOpen_TemporaryStorage.
+
+#### graphics
+* Added nvIoctl3.
+* Adjusted hos version requirements in nvIoctl2 [3.0.0+].
+* Adjusted list of IOCTLs that use the cloned NV service session.
+* console: Added support for SGR 38/48 escape sequences.
+* console: Bold/Faint attributes no longer applied to the background.
+
+#### input
+* hid: Added hidGetNpadLagerType, hidGetNpadStatesLager.
+* hid: Added HidNpadLagerType enum.
+* hid: Added HidNpadLagerState struct.
+* hid: Updated HidNpadStyleTag, HidNpadButton, HidDeviceTypeBits, HidDeviceType, HidAppletFooterUiType enums.
+* hid: Updated HidNpadInternalState struct.
+* hidsys: Added hidsysAcquireUniquePadConnectionEventHandle, hidsysGetUniquePadBluetoothAddress, hidsysDisconnectUniquePad, hidsysGetUniquePadType, hidsysGetUniquePadInterface, hidsysGetUniquePadControllerNumber.
+* hidsys: Added HidsysUniquePadType enum.
+
+#### other
+* Added `BITL()` macro (unsigned long, i.e. 64-bit unsigned integer).
+* bpc: Adjusted for removed commands in [14.0.0+].
+* bpc: Added bpcGetPowerButton [6.0.0+].
+* btdrv: Adjusted for removed commands in [14.0.0+].
+* btm: Corrected inverted hos version check affecting several commands.
+* nfc: Added nfcSendCommandByPassThrough, nfcKeepPassThroughSession, nfcReleasePassThroughSession.
+* pm: Added support for [14.0.0+].
+* ts: Adjusted for removed commands in [14.0.0+].
+
+Several issues were fixed, and usability and stability were improved.
+
+## Version 4.2.0
+
+#### system
+* Added new SVCs introduced in [13.0.0+].
+* Thread structures are now pre-populated with information prior to creation.
+
+#### input
+* hidsys: Added support for [13.0.0+].
+* hiddbg: Added support for [13.0.0+].
+
+#### graphics
+* Fixed crashes caused by arbitrary sizes in linear framebuffers.
+
+#### other
+* ncm: Added support for [13.0.0+].
+* setsys: Added support for [13.0.0+].
+  * Filled in SetSysNxControllerSettings structure definition (which was previously unpopulated).
+* btm: Added support for [13.0.0+].
+* btdrv: Added support for [13.0.0+].
+  * Fixed btdrvRespondToSspRequest for [12.0.0+].
+* psel: Added support for [13.0.0+] (pselShowUserQualificationPromoter).
+* Corrected ldr:ro/ro:1 initialization.
+
+Several issues were fixed, and usability and stability were improved.
+
 ## Version 4.1.3
 
 #### input

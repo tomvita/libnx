@@ -772,6 +772,18 @@ Result nsIsAnyApplicationEntityInstalled(u64 application_id, bool *out);
 Result nsCleanupUnavailableAddOnContents(u64 application_id, AccountUid uid);
 
 /**
+ * @brief EstimateSizeToMove
+ * @note Only available on [10.0.0+].
+ * @param[in] storage_ids Array of u8 \ref NcmStorageId.
+ * @param[in] count Size of the storage_ids array in entries.
+ * @param[in] storage_id storage_id \ref NcmStorageId
+ * @param[in] flags Flags
+ * @param[in] application_id ApplicationId.
+ * @param[out] Out Output value.
+ */
+Result nsEstimateSizeToMove(u8 *storage_ids, s32 count, NcmStorageId storage_id, u32 flags, u64 application_id, s64 *out);
+
+/**
  * @brief FormatSdCard
  * @note Only available on [2.0.0+].
  */
@@ -1327,8 +1339,8 @@ Result nsdevGetShellEventInfo(NsShellEventInfo* out); ///< [1.0.0-9.2.0]
 Result nsdevTerminateApplication(void);
 Result nsdevPrepareLaunchProgramFromHost(NsLaunchProperties* out, const char* path, size_t path_len); ///< [1.0.0-9.2.0]
 Result nsdevLaunchApplicationForDevelop(u64* out_pid, u64 application_id, u32 flags); ///< [1.0.0-9.2.0]
-Result nsdevLaunchApplicationFromHost(u64* out_pid, const char* path, size_t path_len, u32 flags); ///< [10.0.0+]
-Result nsdevLaunchApplicationWithStorageIdForDevelop(u64* out_pid, u64 application_id, u32 flags, u8 app_storage_id, u8 patch_storage_id);
+Result nsdevLaunchApplicationFromHost(u64* out_pid, const char* path, size_t path_len, u32 flags); ///< [10.0.0-17.0.1]
+Result nsdevLaunchApplicationWithStorageIdForDevelop(u64* out_pid, u64 application_id, u32 flags, u8 app_storage_id, u8 patch_storage_id); ///< [1.0.0-17.0.1]
 Result nsdevIsSystemMemoryResourceLimitBoosted(bool* out); ///< [6.0.0-8.1.0]
 Result nsdevGetRunningApplicationProcessIdForDevelop(u64* out_pid); ///< [6.0.0+]
 Result nsdevSetCurrentApplicationRightsEnvironmentCanBeActiveForDevelop(bool can_be_active); ///< [6.0.0+]

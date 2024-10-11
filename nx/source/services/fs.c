@@ -60,13 +60,17 @@ NX_INLINE Result _fsObjectDispatchImpl(
     _fsObjectDispatchImpl((_s),(_rid),NULL,0,NULL,0,(SfDispatchParams){ __VA_ARGS__ })
 
 #define _fsObjectDispatchIn(_s,_rid,_in,...) \
-    _fsObjectDispatchImpl((_s),(_rid),&(_in),sizeof(_in),NULL,0,(SfDispatchParams){ __VA_ARGS__ })
+    ({ _Static_assert(!(serviceMacroDetectIsPointer(_in))); \
+    _fsObjectDispatchImpl((_s),(_rid),&(_in),sizeof(_in),NULL,0,(SfDispatchParams){ __VA_ARGS__ }); })
 
 #define _fsObjectDispatchOut(_s,_rid,_out,...) \
-    _fsObjectDispatchImpl((_s),(_rid),NULL,0,&(_out),sizeof(_out),(SfDispatchParams){ __VA_ARGS__ })
+    ({ _Static_assert(!(serviceMacroDetectIsPointer(_out))); \
+    _fsObjectDispatchImpl((_s),(_rid),NULL,0,&(_out),sizeof(_out),(SfDispatchParams){ __VA_ARGS__ }); })
 
 #define _fsObjectDispatchInOut(_s,_rid,_in,_out,...) \
-    _fsObjectDispatchImpl((_s),(_rid),&(_in),sizeof(_in),&(_out),sizeof(_out),(SfDispatchParams){ __VA_ARGS__ })
+    ({ _Static_assert(!(serviceMacroDetectIsPointer(_in))); \
+    _Static_assert(!(serviceMacroDetectIsPointer(_out))); \
+    _fsObjectDispatchImpl((_s),(_rid),&(_in),sizeof(_in),&(_out),sizeof(_out),(SfDispatchParams){ __VA_ARGS__ }); })
 
 NX_GENERATE_SERVICE_GUARD(fs);
 
@@ -121,6 +125,14 @@ static Result _fsCmdNoInOutU8(Service* srv, u8 *out, u32 cmd_id) {
     return _fsObjectDispatchOut(srv, cmd_id, *out);
 }
 
+static Result _fsCmdNoInOutU32(Service* srv, u32 *out, u32 cmd_id) {
+    return _fsObjectDispatchOut(srv, cmd_id, *out);
+}
+
+static Result _fsCmdNoInOutS64(Service* srv, s64 *out, u32 cmd_id) {
+    return _fsObjectDispatchOut(srv, cmd_id, *out);
+}
+
 static Result _fsCmdNoInOutBool(Service* srv, bool *out, u32 cmd_id) {
     u8 tmp=0;
     Result rc = _fsCmdNoInOutU8(srv, &tmp, cmd_id);
@@ -128,12 +140,19 @@ static Result _fsCmdNoInOutBool(Service* srv, bool *out, u32 cmd_id) {
     return rc;
 }
 
+static Result _fsCmdInSizeOutBuffer(Service* srv, void *dst, size_t dst_size, s64 size, u32 cmd_id) {
+    return _fsObjectDispatchIn(srv, cmd_id, size,
+        .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_Out },
+        .buffers = { { dst, dst_size } },
+    );
+}
+
 //-----------------------------------------------------------------------------
 // IFileSystemProxy
 //-----------------------------------------------------------------------------
 
 Result fsOpenFileSystem(FsFileSystem* out, FsFileSystemType fsType, const char* contentPath) {
-    return fsOpenFileSystemWithId(out, 0, fsType, contentPath);
+    return fsOpenFileSystemWithId(out, 0, fsType, contentPath, FsContentAttributes_None);
 }
 
 static Result _fsOpenFileSystem(FsFileSystem* out, FsFileSystemType fsType, const char* contentPath) {
@@ -165,18 +184,33 @@ Result fsOpenFileSystemWithPatch(FsFileSystem* out, u64 id, FsFileSystemType fsT
     );
 }
 
-static Result _fsOpenFileSystemWithId(FsFileSystem* out, u64 id, FsFileSystemType fsType, const char* contentPath) {
-    const struct {
-        u32 fsType;
-        u64 id;
-    } in = { fsType, id };
+static Result _fsOpenFileSystemWithId(FsFileSystem* out, u64 id, FsFileSystemType fsType, const char* contentPath, FsContentAttributes attr) {
+    if (hosversionAtLeast(16,0,0)) {
+        const struct {
+            u8 attr;
+            u32 fsType;
+            u64 id;
+        } in = { attr, fsType, id };
 
-    return _fsObjectDispatchIn(&g_fsSrv, 8, in,
-        .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
-        .buffers = { { contentPath, FS_MAX_PATH } },
-        .out_num_objects = 1,
-        .out_objects = &out->s,
-    );
+        return _fsObjectDispatchIn(&g_fsSrv, 10, in,
+            .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
+            .buffers = { { contentPath, FS_MAX_PATH } },
+            .out_num_objects = 1,
+            .out_objects = &out->s,
+        );
+    } else {
+        const struct {
+            u32 fsType;
+            u64 id;
+        } in = { fsType, id };
+
+        return _fsObjectDispatchIn(&g_fsSrv, 8, in,
+            .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
+            .buffers = { { contentPath, FS_MAX_PATH } },
+            .out_num_objects = 1,
+            .out_objects = &out->s,
+        );
+    }
 }
 
 Result fsOpenDataFileSystemByProgramId(FsFileSystem *out, u64 program_id) {
@@ -189,12 +223,12 @@ Result fsOpenDataFileSystemByProgramId(FsFileSystem *out, u64 program_id) {
     );
 }
 
-Result fsOpenFileSystemWithId(FsFileSystem* out, u64 id, FsFileSystemType fsType, const char* contentPath) {
+Result fsOpenFileSystemWithId(FsFileSystem* out, u64 id, FsFileSystemType fsType, const char* contentPath, FsContentAttributes attr) {
     char sendStr[FS_MAX_PATH] = {0};
     strncpy(sendStr, contentPath, sizeof(sendStr)-1);
 
     if (hosversionAtLeast(2,0,0))
-        return _fsOpenFileSystemWithId(out, id, fsType, sendStr);
+        return _fsOpenFileSystemWithId(out, id, fsType, sendStr, attr);
     else
         return _fsOpenFileSystem(out, fsType, sendStr);
 }
@@ -434,6 +468,19 @@ Result fsOpenSaveDataInfoReader(FsSaveDataInfoReader* out, FsSaveDataSpaceId sav
     }
 }
 
+Result fsOpenSaveDataInfoReaderWithFilter(FsSaveDataInfoReader* out, FsSaveDataSpaceId save_data_space_id, const FsSaveDataFilter *save_data_filter) {
+    const struct {
+        u8 save_data_space_id;
+        u8 pad[7];
+        FsSaveDataFilter save_data_filter;
+    } in = { (u8)save_data_space_id, {0}, *save_data_filter };
+
+    return _fsObjectDispatchIn(&g_fsSrv, 68, in,
+        .out_num_objects = 1,
+        .out_objects = &out->s,
+    );
+}
+
 Result fsOpenImageDirectoryFileSystem(FsFileSystem* out, FsImageDirectoryId image_directory_id) {
     u32 tmp=image_directory_id;
     return _fsObjectDispatchIn(&g_fsSrv, 100, tmp,
@@ -506,8 +553,22 @@ Result fsIsSignedSystemPartitionOnSdCardValid(bool *out) {
     return _fsCmdNoInOutBool(&g_fsSrv, out, 640);
 }
 
+Result fsGetProgramId(u64* out, const char *path, FsContentAttributes attr) {
+    if (hosversionBefore(17,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    char send_path[FS_MAX_PATH] = {0};
+    strncpy(send_path, path, FS_MAX_PATH-1);
+
+    const u8 in = attr;
+    return _fsObjectDispatchInOut(&g_fsSrv, 618, in, *out,
+        .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
+        .buffers = { { send_path, sizeof(send_path) } },
+    );
+}
+
 Result fsGetRightsIdByPath(const char* path, FsRightsId* out_rights_id) {
-    if (hosversionBefore(2,0,0))
+    if (!hosversionBetween(2, 16))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     char send_path[FS_MAX_PATH] = {0};
@@ -519,12 +580,14 @@ Result fsGetRightsIdByPath(const char* path, FsRightsId* out_rights_id) {
     );
 }
 
-Result fsGetRightsIdAndKeyGenerationByPath(const char* path, u8* out_key_generation, FsRightsId* out_rights_id) {
+Result fsGetRightsIdAndKeyGenerationByPath(const char* path, FsContentAttributes attr, u8* out_key_generation, FsRightsId* out_rights_id) {
     if (hosversionBefore(3,0,0))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     char send_path[FS_MAX_PATH] = {0};
     strncpy(send_path, path, FS_MAX_PATH-1);
+
+    const u8 in = attr;
 
     struct {
         u8 key_generation;
@@ -532,10 +595,18 @@ Result fsGetRightsIdAndKeyGenerationByPath(const char* path, u8* out_key_generat
         FsRightsId rights_id;
     } out;
 
-    Result rc = _fsObjectDispatchOut(&g_fsSrv, 610, out,
-        .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
-        .buffers = { { send_path, sizeof(send_path) } },
-    );
+    Result rc;
+    if (hosversionAtLeast(16,0,0)) {
+        rc = _fsObjectDispatchInOut(&g_fsSrv, 610, in, out,
+            .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
+            .buffers = { { send_path, sizeof(send_path) } },
+        );
+    } else {
+        rc = _fsObjectDispatchOut(&g_fsSrv, 610, out,
+            .buffer_attrs = { SfBufferAttr_HipcPointer | SfBufferAttr_In },
+            .buffers = { { send_path, sizeof(send_path) } },
+        );
+    }
 
     if (R_SUCCEEDED(rc)) {
         if (out_key_generation) *out_key_generation = out.key_generation;
@@ -543,6 +614,13 @@ Result fsGetRightsIdAndKeyGenerationByPath(const char* path, u8* out_key_generat
     }
 
     return rc;
+}
+
+Result fsGetAndClearErrorInfo(FsFileSystemProxyErrorInfo *out) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _fsObjectDispatchOut(&g_fsSrv, 800, *out);
 }
 
 Result fsDisableAutoSaveDataCreation(void) {
@@ -579,6 +657,31 @@ Result fsGetProgramIndexForAccessLog(u32 *out_program_index, u32 *out_program_co
         if (out_program_count) *out_program_count = out.count;
     }
     return rc;
+}
+
+Result fsGetAndClearMemoryReportInfo(FsMemoryReportInfo* out) {
+    if (hosversionBefore(4,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    return _fsObjectDispatchOut(&g_fsSrv, 1009, *out);
+}
+
+// Wrapper(s) for fsCreateSaveDataFileSystem.
+Result fsCreate_TemporaryStorage(u64 application_id, u64 owner_id, s64 size, u32 flags) {
+    FsSaveDataAttribute attr = {
+        .application_id = application_id,
+        .save_data_type = FsSaveDataType_Temporary,
+    };
+    FsSaveDataCreationInfo create = {
+        .save_data_size = size,
+        .journal_size = 0,
+        .available_size = 0x4000,
+        .owner_id = owner_id,
+        .flags = flags,
+        .save_data_space_id = FsSaveDataSpaceId_Temporary,
+    };
+    FsSaveDataMetaInfo meta={};
+
+    return fsCreateSaveDataFileSystem(&attr, &create, &meta);
 }
 
 // Wrapper(s) for fsCreateSaveDataFileSystemBySystemSaveDataId.
@@ -655,7 +758,7 @@ Result fsOpen_TemporaryStorage(FsFileSystem* out) {
     memset(&attr, 0, sizeof(attr));
     attr.save_data_type = FsSaveDataType_Temporary;
 
-    return fsOpenSaveDataFileSystem(out, FsSaveDataType_Temporary, &attr);
+    return fsOpenSaveDataFileSystem(out, FsSaveDataSpaceId_Temporary, &attr);
 }
 
 Result fsOpen_CacheStorage(FsFileSystem* out, u64 application_id, u16 save_data_index) {
@@ -832,6 +935,13 @@ Result fsFsQueryEntry(FsFileSystem* fs, void *out, size_t out_size, const void *
             { out,  out_size    },
         },
     );
+}
+
+Result fsFsGetFileSystemAttribute(FsFileSystem* fs, FsFileSystemAttribute *out) {
+    if (hosversionBefore(15,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _fsObjectDispatchOut(&fs->s, 16, *out);
 }
 
 Result fsFsSetConcatenationFileAttribute(FsFileSystem* fs, const char *path) {
@@ -1030,8 +1140,81 @@ void fsEventNotifierClose(FsEventNotifier* e) {
 // IDeviceOperator
 //-----------------------------------------------------------------------------
 
+static Result _fsCmdGetAndClearStorageErrorInfo(Service *srv, FsStorageErrorInfo* out_sei, s64 *out_log_size, void *dst, size_t dst_size, s64 size, u32 cmd_id) {
+    struct {
+        FsStorageErrorInfo error_info;
+        s64 log_size;
+    } out;
+
+    Result rc = _fsObjectDispatchInOut(srv, cmd_id, size, out,
+        .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_Out },
+        .buffers = { { dst, dst_size } },
+    );
+
+    if (R_SUCCEEDED(rc)) {
+        *out_sei = out.error_info;
+        *out_log_size = out.log_size;
+    }
+
+    return rc;
+}
+
 Result fsDeviceOperatorIsSdCardInserted(FsDeviceOperator* d, bool* out) {
     return _fsCmdNoInOutBool(&d->s, out, 0);
+}
+
+Result fsDeviceOperatorGetSdCardSpeedMode(FsDeviceOperator* d, s64* out) {
+    return _fsCmdNoInOutS64(&d->s, out, 1);
+}
+
+Result fsDeviceOperatorGetSdCardCid(FsDeviceOperator* d, void* dst, size_t dst_size, s64 size) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    return _fsCmdInSizeOutBuffer(&d->s, dst, dst_size, size, 2);
+}
+
+Result fsDeviceOperatorGetSdCardUserAreaSize(FsDeviceOperator* d, s64* out) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    return _fsCmdNoInOutS64(&d->s, out, 3);
+}
+
+Result fsDeviceOperatorGetSdCardProtectedAreaSize(FsDeviceOperator* d, s64* out) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    return _fsCmdNoInOutS64(&d->s, out, 4);
+}
+
+Result fsDeviceOperatorGetAndClearSdCardErrorInfo(FsDeviceOperator* d, FsStorageErrorInfo* out, s64 *out_log_size, void *dst, size_t dst_size, s64 size) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    return _fsCmdGetAndClearStorageErrorInfo(&d->s, out, out_log_size, dst, dst_size, size, 5);
+}
+
+Result fsDeviceOperatorGetMmcCid(FsDeviceOperator* d, void* dst, size_t dst_size, s64 size) {
+    return _fsCmdInSizeOutBuffer(&d->s, dst, dst_size, size, 100);
+}
+
+Result fsDeviceOperatorGetMmcSpeedMode(FsDeviceOperator* d, s64* out) {
+    return _fsCmdNoInOutS64(&d->s, out, 101);
+}
+
+Result fsDeviceOperatorGetMmcPatrolCount(FsDeviceOperator* d, u32* out) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    return _fsCmdNoInOutU32(&d->s, out, 112);
+}
+
+Result fsDeviceOperatorGetAndClearMmcErrorInfo(FsDeviceOperator* d, FsStorageErrorInfo* out, s64 *out_log_size, void *dst, size_t dst_size, s64 size) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    return _fsCmdGetAndClearStorageErrorInfo(&d->s, out, out_log_size, dst, dst_size, size, 113);
+}
+
+Result fsDeviceOperatorGetMmcExtendedCsd(FsDeviceOperator* d, void* dst, size_t dst_size, s64 size) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    return _fsCmdInSizeOutBuffer(&d->s, dst, dst_size, size, 114);
 }
 
 Result fsDeviceOperatorIsGameCardInserted(FsDeviceOperator* d, bool* out) {
@@ -1042,8 +1225,57 @@ Result fsDeviceOperatorGetGameCardHandle(FsDeviceOperator* d, FsGameCardHandle* 
     return _fsObjectDispatchOut(&d->s, 202, *out);
 }
 
+Result fsDeviceOperatorGetGameCardUpdatePartitionInfo(FsDeviceOperator* d, const FsGameCardHandle* handle, FsGameCardUpdatePartitionInfo* out) {
+    return _fsObjectDispatchInOut(&d->s, 203, *handle, *out);
+}
+
 Result fsDeviceOperatorGetGameCardAttribute(FsDeviceOperator* d, const FsGameCardHandle* handle, u8 *out) {
     return _fsObjectDispatchInOut(&d->s, 205, *handle, *out);
+}
+
+Result fsDeviceOperatorGetGameCardDeviceCertificate(FsDeviceOperator* d, const FsGameCardHandle* handle, void* dst, size_t dst_size, s64 size) {
+    const struct {
+        FsGameCardHandle handle;
+        s64 buffer_size;
+    } in = { *handle, size };
+
+    return _fsObjectDispatchIn(&d->s, 206, in,
+        .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_Out },
+        .buffers = { { dst, dst_size } });
+}
+
+Result fsDeviceOperatorGetGameCardIdSet(FsDeviceOperator* d, void* dst, size_t dst_size, s64 size) {
+    return _fsCmdInSizeOutBuffer(&d->s, dst, dst_size, size, 208);
+}
+
+Result fsDeviceOperatorGetGameCardErrorReportInfo(FsDeviceOperator* d, FsGameCardErrorReportInfo* out) {
+    if (hosversionBefore(2,1,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    return _fsObjectDispatchOut(&d->s, 217, *out);
+}
+
+Result fsDeviceOperatorGetGameCardDeviceId(FsDeviceOperator* d, void* dst, size_t dst_size, s64 size) {
+    if (hosversionBefore(3,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    return _fsCmdInSizeOutBuffer(&d->s, dst, dst_size, size, 218);
+}
+
+Result fsDeviceOperatorChallengeCardExistence(FsDeviceOperator* d, const FsGameCardHandle* handle, void* dst, size_t dst_size, void* seed, size_t seed_size, void* value, size_t value_size) {
+    if (hosversionBefore(8,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _fsObjectDispatchIn(&d->s, 219, *handle,
+        .buffer_attrs = {
+            SfBufferAttr_HipcMapAlias | SfBufferAttr_Out,
+            SfBufferAttr_HipcMapAlias | SfBufferAttr_In,
+            SfBufferAttr_HipcMapAlias | SfBufferAttr_In,
+        },
+        .buffers = {
+            { dst,   dst_size   },
+            { seed,  seed_size  },
+            { value, value_size },
+        },
+    );
 }
 
 void fsDeviceOperatorClose(FsDeviceOperator* d) {

@@ -345,6 +345,22 @@ SVC_BEGIN svcGetResourceLimitPeakValue
 	ret
 SVC_END
 
+SVC_BEGIN svcCreateIoPool
+	str x0, [sp, #-16]!
+	svc 0x39
+	ldr x2, [sp], #16
+	str w1, [x2]
+	ret
+SVC_END
+
+SVC_BEGIN svcCreateIoRegion
+	str x0, [sp, #-16]!
+	svc 0x3A
+	ldr x2, [sp], #16
+	str w1, [x2]
+	ret
+SVC_END
+
 SVC_BEGIN svcDumpInfo
 	svc 0x3C
 	ret
@@ -404,6 +420,16 @@ SVC_BEGIN svcCreateEvent
 	ldp x3, x4, [sp], #16
 	str w1, [x3]
 	str w2, [x4]
+	ret
+SVC_END
+
+SVC_BEGIN svcMapIoRegion
+	svc 0x46
+	ret
+SVC_END
+
+SVC_BEGIN svcUnmapIoRegion
+	svc 0x47
 	ret
 SVC_END
 
@@ -488,7 +514,7 @@ SVC_BEGIN svcQueryPhysicalAddress
 	ret
 SVC_END
 
-SVC_BEGIN svcQueryIoMapping
+SVC_BEGIN svcQueryMemoryMapping
 	stp x0, x1, [sp, #-16]!
 	svc 0x55
 	ldp x3, x4, [sp], #16
@@ -770,5 +796,15 @@ SVC_BEGIN svcCallSecureMonitor
 	stp x2, x3, [x8, #0x10]
 	stp x4, x5, [x8, #0x20]
 	stp x6, x7, [x8, #0x30]
+	ret
+SVC_END
+
+SVC_BEGIN svcMapInsecurePhysicalMemory
+	svc 0x90
+	ret
+SVC_END
+
+SVC_BEGIN svcUnmapInsecurePhysicalMemory
+	svc 0x91
 	ret
 SVC_END

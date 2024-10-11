@@ -28,11 +28,7 @@ struct __pthread_t
     void *rc;
 };
 
-void __attribute__((weak)) NORETURN __libnx_exit(int rc);
-
-extern const u8 __tdata_lma[];
-extern const u8 __tdata_lma_end[];
-extern u8 __tls_start[];
+void __attribute__((weak)) NX_NORETURN __libnx_exit(int rc);
 
 /// TimeType passed to timeGetCurrentTime() during time initialization. If that fails and __nx_time_type isn't TimeType_Default, timeGetCurrentTime() will be called again with TimeType_Default.
 __attribute__((weak)) TimeType __nx_time_type = TimeType_Default;
@@ -320,10 +316,13 @@ void __libnx_init_time(void)
         hour = tmp_offset % 24;
 
         memset(envstr, 0, sizeof(envstr));
-
+        strptr = envstr;
+         // Some tznames have numeric characters and '-'/'+', so quote tzname with <>.
+        *strptr++ = '<';
         //Avoid using *printf.
-        strncpy(envstr, /*info.timezoneName*/"NX", sizeof(envstr)-1); // Some tznames have numeric characters and '-'/'+', so the actual tzname can't be used.
+        strncpy(strptr, info.timezoneName, sizeof(envstr)-1);
         strptr = &envstr[strlen(envstr)];
+        *strptr++ = '>';
         *strptr++ = is_west ? '+' : '-';
 
         *strptr++ = '0' + (hour / 10);
@@ -433,7 +432,10 @@ void newlibSetup(void)
     tv->magic      = THREADVARS_MAGIC;
     tv->thread_ptr = NULL;
     tv->reent      = _impure_ptr;
-    tv->tls_tp     = __tls_start-2*sizeof(void*); // subtract size of Thread Control Block (TCB)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+    tv->tls_tp     = __tls_start-getTlsStartOffset();
+#pragma GCC diagnostic pop
     tv->handle     = envGetMainThreadHandle();
 
     u32 tls_size = __tdata_lma_end - __tdata_lma;

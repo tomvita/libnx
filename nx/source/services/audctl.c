@@ -20,13 +20,13 @@ Service* audctlGetServiceSession(void) {
     return &g_audctlSrv;
 }
 
-Result audctlGetTargetVolume(float* volume_out, AudioTarget target) {
+Result audctlGetTargetVolume(s32* volume_out, AudioTarget target) {
     const struct {
         u32 target;
     } in = { target };
 
     struct {
-        float volume;
+        s32 volume;
     } out;
 
     Result rc = serviceDispatchInOut(&g_audctlSrv, 0, in, out);
@@ -37,18 +37,18 @@ Result audctlGetTargetVolume(float* volume_out, AudioTarget target) {
     return rc;
 }
 
-Result audctlSetTargetVolume(AudioTarget target, float volume) {
+Result audctlSetTargetVolume(AudioTarget target, s32 volume) {
     const struct {
         u32 target;
-        float volume;
+        s32 volume;
     } in = { target, volume };
 
     return serviceDispatchIn(&g_audctlSrv, 1, in);
 }
 
-Result audctlGetTargetVolumeMin(float* volume_out) {
+Result audctlGetTargetVolumeMin(s32* volume_out) {
     struct {
-        float volume;
+        s32 volume;
     } out;
 
     Result rc = serviceDispatchOut(&g_audctlSrv, 2, out);
@@ -59,9 +59,9 @@ Result audctlGetTargetVolumeMin(float* volume_out) {
     return rc;
 }
 
-Result audctlGetTargetVolumeMax(float* volume_out) {
+Result audctlGetTargetVolumeMax(s32* volume_out) {
     struct {
-        float volume;
+        s32 volume;
     } out;
 
     Result rc = serviceDispatchOut(&g_audctlSrv, 3, out);
@@ -337,6 +337,22 @@ Result audctlGetSystemOutputMasterVolume(float* volume_out) {
 
     if (R_SUCCEEDED(rc)) {
         *volume_out = out.volume;
+    }
+    return rc;
+}
+
+Result audctlGetActiveOutputTarget(AudioTarget* target) {
+    if (hosversionBefore(13,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    struct {
+        u32 target;
+    } out;
+
+    Result rc = serviceDispatchOut(&g_audctlSrv, 32, out);
+
+    if (R_SUCCEEDED(rc)) {
+        *target = out.target;
     }
     return rc;
 }
