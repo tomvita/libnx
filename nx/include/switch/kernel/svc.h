@@ -41,7 +41,7 @@ typedef enum {
     MemType_CodeReadOnly=0x14,        ///< Mapped in kernel during \ref svcControlCodeMemory.
     MemType_CodeWritable=0x15,        ///< Mapped in kernel during \ref svcControlCodeMemory.
     MemType_Coverage=0x16,            ///< Not available.
-    MemType_Insecure=0x17,            ///< Mapped in kernel during \ref svcMapInsecureMemory.
+    MemType_Insecure=0x17,            ///< Mapped in kernel during \ref svcMapInsecurePhysicalMemory.
 } MemoryType;
 
 /// Memory state bitmasks.
@@ -69,10 +69,11 @@ typedef enum {
 
 /// Memory attribute bitmasks.
 typedef enum {
-    MemAttr_IsBorrowed=BIT(0),     ///< Is borrowed memory.
-    MemAttr_IsIpcMapped=BIT(1),    ///< Is IPC mapped (when IpcRefCount > 0).
-    MemAttr_IsDeviceMapped=BIT(2), ///< Is device mapped (when DeviceRefCount > 0).
-    MemAttr_IsUncached=BIT(3),     ///< Is uncached.
+    MemAttr_IsBorrowed=BIT(0),         ///< Is borrowed memory.
+    MemAttr_IsIpcMapped=BIT(1),        ///< Is IPC mapped (when IpcRefCount > 0).
+    MemAttr_IsDeviceMapped=BIT(2),     ///< Is device mapped (when DeviceRefCount > 0).
+    MemAttr_IsUncached=BIT(3),         ///< Is uncached.
+    MemAttr_IsPermissionLocked=BIT(4), ///< Is permission locked.
 } MemoryAttribute;
 
 /// Memory permission bitmasks.
@@ -108,7 +109,7 @@ typedef struct {
 /// Secure monitor arguments.
 typedef struct {
     u64 X[8]; ///< Values of X0 through X7.
-} PACKED SecmonArgs;
+} NX_PACKED SecmonArgs;
 
 /// Break reasons
 typedef enum {
@@ -208,6 +209,8 @@ typedef enum {
     InfoType_FreeThreadCount                = 24, ///< [11.0.0+] The number of free threads available to the process's resource limit.
     InfoType_ThreadTickCount                = 25, ///< [13.0.0+] Number of ticks spent on thread.
     InfoType_IsSvcPermitted                 = 26, ///< [14.0.0+] Does process have access to SVC (only usable with \ref svcSynchronizePreemptionState at present).
+    InfoType_IoRegionHint                   = 27, ///< [16.0.0+] Low bits of the physical address for a KIoRegion.
+    InfoType_AliasRegionExtraSize           = 28, ///< [18.0.0+] Extra size added to the reserved region.
 
     InfoType_ThreadTickCountDeprecated      = 0xF0000002, ///< [1.0.0-12.1.0] Number of ticks spent on thread.
 } InfoType;
@@ -361,7 +364,7 @@ Result svcQueryMemory(MemoryInfo* meminfo_ptr, u32 *pageinfo, u64 addr);
  * @note Syscall number 0x07.
  */
 
-void NORETURN svcExitProcess(void);
+void NX_NORETURN svcExitProcess(void);
 
 /**
  * @brief Creates a thread.
@@ -381,7 +384,7 @@ Result svcStartThread(Handle handle);
  * @brief Exits the current thread.
  * @note Syscall number 0x0A.
  */
-void NORETURN svcExitThread(void);
+void NX_NORETURN svcExitThread(void);
 
 /**
  * @brief Sleeps the current thread for the specified amount of time.
@@ -667,7 +670,7 @@ Result svcOutputDebugString(const char *str, u64 size);
  * @param[in] res Result code.
  * @note Syscall number 0x28.
  */
-void NORETURN svcReturnFromException(Result res);
+void NX_NORETURN svcReturnFromException(Result res);
 
 /**
  * @brief Retrieves information about the system, or a certain kernel object.
@@ -1117,14 +1120,14 @@ Result svcQueryPhysicalAddress(PhysicalMemoryInfo *out, u64 virtaddr);
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning Only exists on [10.0.0+]. For older versions use \ref svcLegacyQueryIoMapping.
  */
-Result svcQueryIoMapping(u64* virtaddr, u64* out_size, u64 physaddr, u64 size);
+Result svcQueryMemoryMapping(u64* virtaddr, u64* out_size, u64 physaddr, u64 size);
 
 /**
  * @brief Returns a virtual address mapped to a given IO range.
  * @return Result code.
  * @note Syscall number 0x55.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
- * @warning Only exists on [1.0.0-9.2.0]. For newer versions use \ref svcQueryIoMapping.
+ * @warning Only exists on [1.0.0-9.2.0]. For newer versions use \ref svcQueryMemoryMapping.
  */
 Result svcLegacyQueryIoMapping(u64* virtaddr, u64 physaddr, u64 size);
 
@@ -1579,13 +1582,13 @@ void svcCallSecureMonitor(SecmonArgs* regs);
  * @return Result code.
  * @note Syscall number 0x90.
  */
-Result svcMapInsecureMemory(void *address, u64 size);
+Result svcMapInsecurePhysicalMemory(void *address, u64 size);
 
 /**
  * @brief Undoes the effects of \ref svcMapInsecureMemory. [15.0.0+]
  * @return Result code.
  * @note Syscall number 0x91.
  */
-Result svcUnmapInsecureMemory(void *address, u64 size);
+Result svcUnmapInsecurePhysicalMemory(void *address, u64 size);
 
 ///@}
