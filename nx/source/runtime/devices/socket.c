@@ -16,6 +16,7 @@
 #include "result.h"
 #include "services/bsd.h"
 #include "services/ssl.h"
+#include "services/nifm.h"
 #include "runtime/devices/socket.h"
 #include "runtime/hosversion.h"
 #include "../alloc.h"
@@ -61,8 +62,6 @@ static const devoptab_t g_socketDevoptab = {
 };
 
 static const SocketInitConfig g_defaultSocketInitConfig = {
-    .bsdsockets_version = 1,
-
     .tcp_tx_buf_size        = 0x8000,
     .tcp_rx_buf_size        = 0x10000,
     .tcp_tx_buf_max_size    = 0x40000,
@@ -81,13 +80,35 @@ const SocketInitConfig *socketGetDefaultInitConfig(void) {
     return &g_defaultSocketInitConfig;
 }
 
+static u32 socketSelectVersion(void) {
+    if (hosversionBefore(3,0,0)) {
+        return 1;
+    } else if (hosversionBefore(4,0,0)) {
+        return 2;
+    } else if (hosversionBefore(5,0,0)) {
+        return 3;
+    } else if (hosversionBefore(6,0,0)) {
+        return 4;
+    } else if (hosversionBefore(8,0,0)) {
+        return 5;
+    } else if (hosversionBefore(9,0,0)) {
+        return 6;
+    } else if (hosversionBefore(13,0,0)) {
+        return 7;
+    } else if (hosversionBefore(16,0,0)) {
+        return 8;
+    } else /* latest known version */ {
+        return 9;
+    }
+}
+
 Result socketInitialize(const SocketInitConfig *config) {
     Result ret = 0;
     if (!config)
         config = &g_defaultSocketInitConfig;
 
     BsdInitConfig bcfg = {
-        .version = config->bsdsockets_version,
+        .version = socketSelectVersion(),
 
         .tcp_tx_buf_size        = config->tcp_tx_buf_size,
         .tcp_rx_buf_size        = config->tcp_rx_buf_size,
@@ -196,6 +217,71 @@ int socketSslConnectionGetSocketDescriptor(SslConnection *c) {
     *(int *)__get_handle(fd)->fileStruct = tmpfd;
 
     return fd;
+}
+
+int socketSslConnectionSetDtlsSocketDescriptor(SslConnection *c, int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
+    int dev;
+    int fd = _socketGetFd(sockfd);
+
+    if (fd==-1)
+        return -1;
+
+    int tmpfd=0;
+    Result rc = sslConnectionSetDtlsSocketDescriptor(c, fd, addr, addrlen, &tmpfd);
+    if (R_FAILED(rc)) {
+        g_bsdResult = rc;
+        errno = EIO;
+        return -1;
+    }
+
+    if (tmpfd==-1) { // The cmd didn't return a sockfd. This error must be ignored.
+        errno = ENOENT;
+        return -1;
+    }
+
+    dev = FindDevice("soc:");
+    if(dev == -1)
+        return -1;
+
+    fd = __alloc_handle(dev);
+    if(fd == -1)
+        return -1;
+
+    *(int *)__get_handle(fd)->fileStruct = tmpfd;
+
+    return fd;
+}
+
+int socketNifmRequestRegisterSocketDescriptor(NifmRequest* r, int sockfd) {
+    int fd = _socketGetFd(sockfd);
+
+    if (fd==-1)
+        return -1;
+
+    Result rc = nifmRequestRegisterSocketDescriptor(r, fd);
+    if (R_FAILED(rc)) {
+        g_bsdResult = rc;
+        errno = EIO;
+        return -1;
+    }
+
+    return 0;
+}
+
+int socketNifmRequestUnregisterSocketDescriptor(NifmRequest* r, int sockfd) {
+    int fd = _socketGetFd(sockfd);
+
+    if (fd==-1)
+        return -1;
+
+    Result rc = nifmRequestUnregisterSocketDescriptor(r, fd);
+    if (R_FAILED(rc)) {
+        g_bsdResult = rc;
+        errno = EIO;
+        return -1;
+    }
+
+    return 0;
 }
 
 /***********************************************************************************************************************/

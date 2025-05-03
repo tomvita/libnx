@@ -31,7 +31,7 @@ typedef enum {
     SetSysProductModel_Iowa    = 3, ///< Mariko Model
     SetSysProductModel_Hoag    = 4, ///< Mariko Lite Model
     SetSysProductModel_Calcio  = 5, ///< Mariko "Simulation" Model
-    SetSysProductModel_Aula    = 6, ///< Mariko Pro Model(?)
+    SetSysProductModel_Aula    = 6, ///< Mariko OLED Model
 } SetSysProductModel;
 
 /// IDs for Language.
@@ -312,7 +312,7 @@ typedef struct {
 /// BluetoothDevicesSettings
 typedef struct {
     BtdrvAddress addr;                    ///< \ref BtdrvAddress
-    BtmBdName name;                       ///< BdName
+    BtmBdName name;                       ///< BdName. Unused on 13.0.0+
     BtmClassOfDevice class_of_device;     ///< ClassOfDevice
     u8 link_key[0x10];                    ///< LinkKey
     u8 link_key_present;                  ///< LinkKeyPresent
@@ -328,7 +328,14 @@ typedef struct {
     u8 device_type;                       ///< DeviceType
     u16 brr_size;                         ///< BrrSize
     u8 brr[0x9];                          ///< Brr
-    u8 reserved[0x12B];                   ///< Reserved
+    union {
+        u8 reserved[0x12B];               ///< Reserved [1.0.0-12.1.0]
+
+        struct {
+            u8 pad;                       ///< Padding
+            char name2[0xF9];             ///< Name
+        };                                ///< [13.0.0+]
+    };
 } SetSysBluetoothDevicesSettings;
 
 /// Structure returned by \ref setsysGetFirmwareVersion.
@@ -433,8 +440,8 @@ typedef struct {
     u8 vertical_active_lines_msb : 4;
     u8 horizontal_sync_offset_pixels_lsb;
     u8 horizontal_sync_pulse_width_pixels_lsb;
-    u8 horizontal_sync_pulse_width_lines_lsb : 4;
-    u8 horizontal_sync_offset_lines_lsb : 4;
+    u8 vertical_sync_pulse_width_lines_lsb : 4;
+    u8 vertical_sync_offset_lines_lsb : 4;
     u8 vertical_sync_pulse_width_lines_msb : 2;
     u8 vertical_sync_offset_lines_msb : 2;
     u8 horizontal_sync_pulse_width_pixels_msb : 2;
@@ -461,7 +468,7 @@ typedef struct {
             u8 svd_index : 7;
             u8 native_flag : 1;
         } svd[0xC];
-    } PACKED video;
+    } NX_PACKED video;
     struct {
         u8 size : 5;
         SetSysBlockType block_type : 3;
@@ -470,7 +477,7 @@ typedef struct {
         u8 padding1 : 1;
         u8 sampling_rates_bitmap;
         u8 bitrate;
-    } PACKED audio;
+    } NX_PACKED audio;
     struct {
         u8 size : 5;
         SetSysBlockType block_type : 3;
@@ -479,7 +486,7 @@ typedef struct {
         u8 mode_bitmap;
         u8 max_tmds_frequency;
         u8 latency_bitmap;
-    } PACKED vendor_specific;
+    } NX_PACKED vendor_specific;
     u8 padding[2];
 } SetSysDataBlock;
 
@@ -490,7 +497,7 @@ typedef struct {
     u16 product_code;
     u32 serial_number;
     u8 manufacture_week;
-    u8 manufacture_year;
+    u8 manufacture_year;                    ///< Real value is val - 10.
     u8 edid_version;
     u8 edid_revision;
     u8 video_input_parameters_bitmap;
@@ -553,6 +560,8 @@ typedef struct {
     SetSysModeLine extended_timing_descriptor[5];
     u8 padding[5];
     u8 extended_checksum;                   ///< Sum of 128 extended bytes should equal 0 mod 256.
+    u8 data2[0x80];                         ///< [13.0.0+]
+    u8 data3[0x80];                         ///< [13.0.0+]
 } SetSysEdid;
 
 /// DataDeletionSettings
@@ -595,6 +604,18 @@ typedef struct {
     u8 field[4];
 } SetSysColor4u8Type;
 
+/// NxControllerLegacySettings
+typedef struct {
+    BtdrvAddress address;
+    u8 type;                            ///< \ref SetSysControllerType.
+    char serial[0x10];
+    SetSysColor4u8Type body_color;
+    SetSysColor4u8Type button_color;
+    u8 unk_x1F[8];
+    u8 unk_x27;
+    u8 interface_type;                  ///< Bitmask with \ref XcdInterfaceType.
+} SetSysNxControllerLegacySettings;
+
 /// NxControllerSettings
 typedef struct {
     BtdrvAddress address;
@@ -605,6 +626,7 @@ typedef struct {
     u8 unk_x1F[8];
     u8 unk_x27;
     u8 interface_type;                  ///< Bitmask with \ref XcdInterfaceType.
+    u8 unk_x29[0x403];                  ///< Unknown
 } SetSysNxControllerSettings;
 
 /// ConsoleSixAxisSensorAccelerationBias
@@ -1193,16 +1215,16 @@ Result setsysGetAudioOutputMode(SetSysAudioOutputModeTarget target, SetSysAudioO
 Result setsysSetAudioOutputMode(SetSysAudioOutputModeTarget target, SetSysAudioOutputMode mode);
 
 /**
- * @brief IsForceMuteOnHeadphoneRemoved
+ * @brief GetSpeakerAutoMuteFlag
  * @param[out] out Output flag.
  */
-Result setsysIsForceMuteOnHeadphoneRemoved(bool *out);
+Result setsysGetSpeakerAutoMuteFlag(bool *out);
 
 /**
- * @brief SetForceMuteOnHeadphoneRemoved
+ * @brief SetSpeakerAutoMuteFlag
  * @param[in] flag Input flag.
  */
-Result setsysSetForceMuteOnHeadphoneRemoved(bool flag);
+Result setsysSetSpeakerAutoMuteFlag(bool flag);
 
 /**
  * @brief GetQuestFlag
@@ -1513,18 +1535,20 @@ Result setsysSetAutoUpdateEnableFlag(bool flag);
 
 /**
  * @brief GetNxControllerSettings
+ * @note On [13.0.0+] \ref setsysGetNxControllerSettingsEx should be used instead.
  * @param[out] total_out Total output entries.
- * @param[out] settings Output array of \ref SetSysNxControllerSettings.
+ * @param[out] settings Output array of \ref SetSysNxControllerLegacySettings.
  * @param[in] count Size of the settings array in entries.
  */
-Result setsysGetNxControllerSettings(s32 *total_out, SetSysNxControllerSettings *settings, s32 count);
+Result setsysGetNxControllerSettings(s32 *total_out, SetSysNxControllerLegacySettings *settings, s32 count);
 
 /**
  * @brief SetNxControllerSettings
- * @param[in] settings Input array of \ref SetSysNxControllerSettings.
+ * @note On [13.0.0+] \ref setsysSetNxControllerSettingsEx should be used instead.
+ * @param[in] settings Input array of \ref SetSysNxControllerLegacySettings.
  * @param[in] count Size of the settings array in entries.
  */
-Result setsysSetNxControllerSettings(const SetSysNxControllerSettings *settings, s32 count);
+Result setsysSetNxControllerSettings(const SetSysNxControllerLegacySettings *settings, s32 count);
 
 /**
  * @brief GetBatteryPercentageFlag
@@ -1668,7 +1692,7 @@ Result setsysSetHeadphoneVolumeUpdateFlag(bool flag);
 
 /**
  * @brief NeedsToUpdateHeadphoneVolume
- * @note Only available on [3.0.0+].
+ * @note Only available on [3.0.0-14.1.2].
  * @param[out] a0 Output arg.
  * @param[out] a1 Output arg.
  * @param[out] a2 Output arg.
@@ -2282,6 +2306,21 @@ Result setsysGetFieldTestingFlag(bool *out);
  * @param[in] flag Input flag.
  */
 Result setsysSetFieldTestingFlag(bool flag);
+
+/**
+ * @brief GetNxControllerSettingsEx
+ * @param[out] total_out Total output entries.
+ * @param[out] settings Output array of \ref SetSysNxControllerSettings.
+ * @param[in] count Size of the settings array in entries.
+ */
+Result setsysGetNxControllerSettingsEx(s32 *total_out, SetSysNxControllerSettings *settings, s32 count);
+
+/**
+ * @brief SetNxControllerSettingsEx
+ * @param[in] settings Input array of \ref SetSysNxControllerSettings.
+ * @param[in] count Size of the settings array in entries.
+ */
+Result setsysSetNxControllerSettingsEx(const SetSysNxControllerSettings *settings, s32 count);
 
 /// Initialize setcal.
 Result setcalInitialize(void);

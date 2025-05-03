@@ -9,6 +9,15 @@
 #include "../sf/service.h"
 #include "../kernel/event.h"
 
+/// NvServiceType, for __nx_nv_service_type.
+typedef enum {
+    NvServiceType_Auto                  = -1,  ///< This is the default. Automatically select the type using \ref appletGetAppletType.
+    NvServiceType_Application           = 0,   ///< Initializes nvdrv.
+    NvServiceType_Applet                = 1,   ///< Initializes nvdrv:a.
+    NvServiceType_System                = 2,   ///< Initializes nvdrv:s.
+    NvServiceType_Factory               = 3,   ///< Initializes nvdrv:t.
+} NvServiceType;
+
 /// Initialize nvdrv*.
 Result nvInitialize(void);
 
@@ -32,7 +41,8 @@ typedef enum {
 
 Result nvOpen(u32 *fd, const char *devicepath);
 Result nvIoctl(u32 fd, u32 request, void* argp);
-Result nvIoctl2(u32 fd, u32 request, void* argp, const void* inbuf, size_t inbuf_size);
+Result nvIoctl2(u32 fd, u32 request, void* argp, const void* inbuf, size_t inbuf_size); ///< [3.0.0+]
+Result nvIoctl3(u32 fd, u32 request, void* argp, void* outbuf, size_t outbuf_size); ///< [3.0.0+]
 Result nvClose(u32 fd);
 Result nvQueryEvent(u32 fd, u32 event_id, Event *event_out);
 

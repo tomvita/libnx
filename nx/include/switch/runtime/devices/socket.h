@@ -10,8 +10,6 @@ typedef enum {
 
 /// Configuration structure for socketInitalize
 typedef struct  {
-    u32 bsdsockets_version;                     ///< Observed 1 on 2.0 LibAppletWeb, 2 on 3.0.
-
     u32 tcp_tx_buf_size;                        ///< Size of the TCP transfer (send) buffer (initial or fixed).
     u32 tcp_rx_buf_size;                        ///< Size of the TCP receive buffer (initial or fixed).
     u32 tcp_tx_buf_max_size;                    ///< Maximum size of the TCP transfer (send) buffer. If it is 0, the size of the buffer is fixed to its initial value.
@@ -45,4 +43,16 @@ int socketSslConnectionSetSocketDescriptor(SslConnection *c, int sockfd);
 
 /// Wrapper for \ref sslConnectionGetSocketDescriptor. Returns the output sockfd on success and -1 on error.
 int socketSslConnectionGetSocketDescriptor(SslConnection *c);
+
+#ifdef _SOCKLEN_T_DECLARED
+struct sockaddr;
+/// Wrapper for \ref sslConnectionSetDtlsSocketDescriptor. Returns the output sockfd on success and -1 on error. errno==ENOENT indicates that no sockfd was returned, this error must be ignored.
+int socketSslConnectionSetDtlsSocketDescriptor(SslConnection *c, int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+#endif
+
+/// Wrapper for \ref nifmRequestRegisterSocketDescriptor. Returns 0 on success and -1 on error.
+int socketNifmRequestRegisterSocketDescriptor(NifmRequest* r, int sockfd);
+
+/// Wrapper for \ref nifmRequestUnregisterSocketDescriptor. Returns 0 on success and -1 on error.
+int socketNifmRequestUnregisterSocketDescriptor(NifmRequest* r, int sockfd);
 

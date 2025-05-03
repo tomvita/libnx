@@ -9,6 +9,7 @@ static Service g_hiddbgSrv;
 
 static bool g_hiddbgHdlsInitialized;
 static TransferMemory g_hiddbgHdlsTmem;
+static void* g_hiddbgHdlsWorkmem;
 
 static const u32 g_hiddbgDeviceTypeInternalTable[] = {
     BIT(20),    // DeviceType 0 Invalid
@@ -72,8 +73,19 @@ static Result _hiddbgCmdInHandle64NoOut(Handle handle, u64 inval, u32 cmd_id) {
     );
 }
 
+static Result _hiddbgCmdInHandle64OutU64(Handle handle, u64 inval, u64 *out, u32 cmd_id) {
+    return serviceDispatchInOut(&g_hiddbgSrv, cmd_id, inval, *out,
+        .in_num_handles = 1,
+        .in_handles = { handle },
+    );
+}
+
 static Result _hiddbgCmdInTmemNoOut(TransferMemory *tmem, u32 cmd_id) {
     return _hiddbgCmdInHandle64NoOut(tmem->handle, tmem->size, cmd_id);
+}
+
+static Result _hiddbgCmdInTmemOutU64(TransferMemory *tmem, u64 *out, u32 cmd_id) {
+    return _hiddbgCmdInHandle64OutU64(tmem->handle, tmem->size, out, cmd_id);
 }
 
 Result hiddbgSetDebugPadAutoPilotState(const HiddbgDebugPadAutoPilotState *state) {
@@ -449,12 +461,17 @@ static void _hiddbgConvertHdlsStateListFromV9(HiddbgHdlsStateList *out, const Hi
     }
 }
 
-static Result _hiddbgAttachHdlsWorkBuffer(TransferMemory *tmem) {
-    return _hiddbgCmdInTmemNoOut(tmem, 324);
+static Result _hiddbgAttachHdlsWorkBuffer(HiddbgHdlsSessionId *session_id, TransferMemory *tmem) {
+    if (hosversionBefore(13,0,0))
+        return _hiddbgCmdInTmemNoOut(tmem, 324);
+    else
+        return _hiddbgCmdInTmemOutU64(tmem, &session_id->id, 324);
 }
 
-Result hiddbgAttachHdlsWorkBuffer(void) {
+Result hiddbgAttachHdlsWorkBuffer(HiddbgHdlsSessionId *session_id, void *buffer, size_t size) {
     Result rc=0;
+
+    if (session_id) session_id->id = 0;
 
     if (hosversionBefore(7,0,0))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
@@ -462,17 +479,19 @@ Result hiddbgAttachHdlsWorkBuffer(void) {
     if (g_hiddbgHdlsInitialized)
         return MAKERESULT(Module_Libnx, LibnxError_AlreadyInitialized);
 
-
-    rc = tmemCreate(&g_hiddbgHdlsTmem, 0x1000, Perm_Rw);
+    rc = tmemCreateFromMemory(&g_hiddbgHdlsTmem, buffer, size, Perm_Rw);
     if (R_FAILED(rc)) return rc;
 
-    rc = _hiddbgAttachHdlsWorkBuffer(&g_hiddbgHdlsTmem);
+    rc = _hiddbgAttachHdlsWorkBuffer(session_id, &g_hiddbgHdlsTmem);
     if (R_FAILED(rc)) tmemClose(&g_hiddbgHdlsTmem);
-    if (R_SUCCEEDED(rc)) g_hiddbgHdlsInitialized = true;
+    if (R_SUCCEEDED(rc)) {
+        g_hiddbgHdlsInitialized = true;
+        g_hiddbgHdlsWorkmem = buffer;
+    }
     return rc;
 }
 
-Result hiddbgReleaseHdlsWorkBuffer(void) {
+Result hiddbgReleaseHdlsWorkBuffer(HiddbgHdlsSessionId session_id) {
     Result rc=0;
 
     if (hosversionBefore(7,0,0))
@@ -483,12 +502,17 @@ Result hiddbgReleaseHdlsWorkBuffer(void) {
 
     g_hiddbgHdlsInitialized = false;
 
-    rc = _hiddbgCmdNoIO(325);
+    if (hosversionBefore(13,0,0))
+        rc = _hiddbgCmdNoIO(325);
+    else
+        rc = _hiddbgCmdInU64NoOut(session_id.id, 325);
+
     tmemClose(&g_hiddbgHdlsTmem);
+    g_hiddbgHdlsWorkmem = NULL;
     return rc;
 }
 
-Result hiddbgIsHdlsVirtualDeviceAttached(HiddbgHdlsHandle handle, bool *out) {
+Result hiddbgIsHdlsVirtualDeviceAttached(HiddbgHdlsSessionId session_id, HiddbgHdlsHandle handle, bool *out) {
     Result rc = 0;
 
     if (hosversionBefore(7,0,0))
@@ -497,12 +521,16 @@ Result hiddbgIsHdlsVirtualDeviceAttached(HiddbgHdlsHandle handle, bool *out) {
     if (!g_hiddbgHdlsInitialized)
         return MAKERESULT(Module_Libnx, LibnxError_NotInitialized);
 
-    rc = _hiddbgCmdNoIO(327);
+    if (hosversionBefore(13,0,0))
+        rc = _hiddbgCmdNoIO(327);
+    else
+        rc = _hiddbgCmdInU64NoOut(session_id.id, 327);
+
     if (R_FAILED(rc)) return rc;
     if (out) {
         *out = false;
         if (hosversionBefore(9,0,0)) {
-            HiddbgHdlsStateListV7 *stateList = (HiddbgHdlsStateListV7*)(g_hiddbgHdlsTmem.src_addr);
+            HiddbgHdlsStateListV7 *stateList = (HiddbgHdlsStateListV7*)g_hiddbgHdlsWorkmem;
             for (s32 i=0; i<stateList->total_entries; i++) {
                 if (stateList->entries[i].handle.handle == handle.handle) {
                     *out = true;
@@ -511,7 +539,7 @@ Result hiddbgIsHdlsVirtualDeviceAttached(HiddbgHdlsHandle handle, bool *out) {
             }
         }
         else if (hosversionBefore(12,0,0)) {
-            HiddbgHdlsStateListV9 *stateList = (HiddbgHdlsStateListV9*)(g_hiddbgHdlsTmem.src_addr);
+            HiddbgHdlsStateListV9 *stateList = (HiddbgHdlsStateListV9*)g_hiddbgHdlsWorkmem;
             for (s32 i=0; i<stateList->total_entries; i++) {
                 if (stateList->entries[i].handle.handle == handle.handle) {
                     *out = true;
@@ -520,7 +548,7 @@ Result hiddbgIsHdlsVirtualDeviceAttached(HiddbgHdlsHandle handle, bool *out) {
             }
         }
         else {
-            HiddbgHdlsStateList *stateList = (HiddbgHdlsStateList*)(g_hiddbgHdlsTmem.src_addr);
+            HiddbgHdlsStateList *stateList = (HiddbgHdlsStateList*)g_hiddbgHdlsWorkmem;
             for (s32 i=0; i<stateList->total_entries; i++) {
                 if (stateList->entries[i].handle.handle == handle.handle) {
                     *out = true;
@@ -532,7 +560,7 @@ Result hiddbgIsHdlsVirtualDeviceAttached(HiddbgHdlsHandle handle, bool *out) {
     return rc;
 }
 
-Result hiddbgDumpHdlsNpadAssignmentState(HiddbgHdlsNpadAssignment *state) {
+Result hiddbgDumpHdlsNpadAssignmentState(HiddbgHdlsSessionId session_id, HiddbgHdlsNpadAssignment *state) {
     Result rc=0;
 
     if (hosversionBefore(7,0,0))
@@ -541,13 +569,17 @@ Result hiddbgDumpHdlsNpadAssignmentState(HiddbgHdlsNpadAssignment *state) {
     if (!g_hiddbgHdlsInitialized)
         return MAKERESULT(Module_Libnx, LibnxError_NotInitialized);
 
-    rc = _hiddbgCmdNoIO(326);
+    if (hosversionBefore(13,0,0))
+        rc = _hiddbgCmdNoIO(326);
+    else
+        rc = _hiddbgCmdInU64NoOut(session_id.id, 326);
+
     if (R_FAILED(rc)) return rc;
-    if (state) memcpy(state, g_hiddbgHdlsTmem.src_addr, sizeof(*state));
+    if (state) memcpy(state, g_hiddbgHdlsWorkmem, sizeof(*state));
     return rc;
 }
 
-Result hiddbgDumpHdlsStates(HiddbgHdlsStateList *state) {
+Result hiddbgDumpHdlsStates(HiddbgHdlsSessionId session_id, HiddbgHdlsStateList *state) {
     Result rc=0;
 
     if (hosversionBefore(7,0,0))
@@ -556,26 +588,30 @@ Result hiddbgDumpHdlsStates(HiddbgHdlsStateList *state) {
     if (!g_hiddbgHdlsInitialized)
         return MAKERESULT(Module_Libnx, LibnxError_NotInitialized);
 
-    rc = _hiddbgCmdNoIO(327);
+    if (hosversionBefore(13,0,0))
+        rc = _hiddbgCmdNoIO(327);
+    else
+        rc = _hiddbgCmdInU64NoOut(session_id.id, 327);
+
     if (R_FAILED(rc)) return rc;
     if (state) {
         if (hosversionBefore(9,0,0)) {
             HiddbgHdlsStateListV7 statev7;
-            memcpy(&statev7, g_hiddbgHdlsTmem.src_addr, sizeof(statev7));
+            memcpy(&statev7, g_hiddbgHdlsWorkmem, sizeof(statev7));
             _hiddbgConvertHdlsStateListFromV7(state, &statev7);
         }
         else if (hosversionBefore(12,0,0)) {
             HiddbgHdlsStateListV9 statev9;
-            memcpy(&statev9, g_hiddbgHdlsTmem.src_addr, sizeof(statev9));
+            memcpy(&statev9, g_hiddbgHdlsWorkmem, sizeof(statev9));
             _hiddbgConvertHdlsStateListFromV9(state, &statev9);
         }
         else
-            memcpy(state, g_hiddbgHdlsTmem.src_addr, sizeof(*state));
+            memcpy(state, g_hiddbgHdlsWorkmem, sizeof(*state));
     }
     return rc;
 }
 
-Result hiddbgApplyHdlsNpadAssignmentState(const HiddbgHdlsNpadAssignment *state, bool flag) {
+Result hiddbgApplyHdlsNpadAssignmentState(HiddbgHdlsSessionId session_id, const HiddbgHdlsNpadAssignment *state, bool flag) {
     if (hosversionBefore(7,0,0))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
@@ -585,11 +621,22 @@ Result hiddbgApplyHdlsNpadAssignmentState(const HiddbgHdlsNpadAssignment *state,
     if (state==NULL)
         return MAKERESULT(Module_Libnx, LibnxError_BadInput);
 
-    memcpy(g_hiddbgHdlsTmem.src_addr, state, sizeof(*state));
-    return _hiddbgCmdInBoolNoOut(flag, 328);
+    memcpy(g_hiddbgHdlsWorkmem, state, sizeof(*state));
+
+    if (hosversionBefore(13,0,0))
+        return _hiddbgCmdInBoolNoOut(flag, 328);
+    else {
+        const struct {
+            u8 flag;
+            u8 pad[7];
+            HiddbgHdlsSessionId session_id;
+        } in = { flag, {0}, session_id };
+
+        return serviceDispatchIn(&g_hiddbgSrv, 328, in);
+    }
 }
 
-Result hiddbgApplyHdlsStateList(const HiddbgHdlsStateList *state) {
+Result hiddbgApplyHdlsStateList(HiddbgHdlsSessionId session_id, const HiddbgHdlsStateList *state) {
     if (hosversionBefore(7,0,0))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
@@ -602,17 +649,20 @@ Result hiddbgApplyHdlsStateList(const HiddbgHdlsStateList *state) {
     if (hosversionBefore(9,0,0)) {
         HiddbgHdlsStateListV7 statev7;
         _hiddbgConvertHdlsStateListToV7(&statev7, state);
-        memcpy(g_hiddbgHdlsTmem.src_addr, &statev7, sizeof(statev7));
+        memcpy(g_hiddbgHdlsWorkmem, &statev7, sizeof(statev7));
     }
     else if (hosversionBefore(12,0,0)) {
         HiddbgHdlsStateListV9 statev9;
         _hiddbgConvertHdlsStateListToV9(&statev9, state);
-        memcpy(g_hiddbgHdlsTmem.src_addr, &statev9, sizeof(statev9));
+        memcpy(g_hiddbgHdlsWorkmem, &statev9, sizeof(statev9));
     }
     else
-        memcpy(g_hiddbgHdlsTmem.src_addr, state, sizeof(*state));
+        memcpy(g_hiddbgHdlsWorkmem, state, sizeof(*state));
 
-    return _hiddbgCmdNoIO(329);
+    if (hosversionBefore(13,0,0))
+        return _hiddbgCmdNoIO(329);
+    else
+        return _hiddbgCmdInU64NoOut(session_id.id, 329);
 }
 
 static Result _hiddbgAttachHdlsVirtualDeviceV7(HiddbgHdlsHandle *handle, const HiddbgHdlsDeviceInfoV7 *info) {

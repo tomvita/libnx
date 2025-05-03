@@ -204,16 +204,15 @@ Result nvioctlChannel_Submit(u32 fd, const nvioctl_cmdbuf *cmdbufs, u32 num_cmdb
         return MAKERESULT(Module_Libnx, LibnxError_OutOfMemory);
 
     struct {
-        __nv_in  u32                 num_cmdbufs;
-        __nv_in  u32                 num_relocs;
-        __nv_in  u32                 num_syncpt_incrs;
-        __nv_in  u32                 num_fences;
-        __nv_in  nvioctl_cmdbuf      cmdbufs     [num_cmdbufs];
-        __nv_in  nvioctl_reloc       relocs      [num_relocs];
-        __nv_in  nvioctl_reloc_shift reloc_shifts[num_relocs];
-        __nv_in  nvioctl_syncpt_incr syncpt_incrs[num_syncpt_incrs];
-        __nv_in  nvioctl_syncpt_incr wait_checks [num_syncpt_incrs];
-        __nv_out nvioctl_fence       fences      [num_fences];
+        __nv_in    u32                 num_cmdbufs;
+        __nv_in    u32                 num_relocs;
+        __nv_in    u32                 num_syncpt_incrs;
+        __nv_in    u32                 num_fences;
+        __nv_in    nvioctl_cmdbuf      cmdbufs     [num_cmdbufs];
+        __nv_in    nvioctl_reloc       relocs      [num_relocs];
+        __nv_in    nvioctl_reloc_shift reloc_shifts[num_relocs];
+        __nv_in    nvioctl_syncpt_incr syncpt_incrs[num_syncpt_incrs];
+        __nv_inout u32                 thresholds  [num_fences];
     } data;
 
     memset(&data, 0, sizeof(data));
@@ -229,9 +228,12 @@ Result nvioctlChannel_Submit(u32 fd, const nvioctl_cmdbuf *cmdbufs, u32 num_cmdb
     Result rc = nvIoctl(fd, _NV_IOWR(0, 0x01, data), &data);
 
     if (R_SUCCEEDED(rc)) {
-        memcpy(fences, data.fences, num_fences * sizeof(nvioctl_fence));
-        for (int i = 0; i < num_fences; ++i)
-            fences[i].id = data.syncpt_incrs[i].syncpt_id;
+        for (int i = 0; i < num_fences; ++i) {
+            fences[i] = (nvioctl_fence){
+                .id    = syncpt_incrs[i].syncpt_id,
+                .value = data.thresholds[i],
+            };
+        }
     }
 
     return rc;
@@ -254,20 +256,36 @@ Result nvioctlChannel_GetSyncpt(u32 fd, u32 id, u32 *syncpt) {
 }
 
 Result nvioctlChannel_GetModuleClockRate(u32 fd, u32 module_id, u32 *freq) {
-    struct {
-        __nv_out u32 rate;
-        __nv_in  u32 module;
-    } data = {
-        .module = module_id,
+    nvioctl_clk_rate data = {
+        .moduleid = module_id,
     };
 
-    u32 ioctl = _NV_IOWR(0, hosversionAtLeast(8,0,0) ? 0x14 : 0x23, data);
-    Result rc = nvIoctl(fd, ioctl, &data);
+    u32 nr = _NV_IOWR(0, hosversionBefore(8,0,0) ? 0x14 : 0x23, data);
+    Result rc = nvIoctl(fd, nr, &data);
 
     if (R_SUCCEEDED(rc) && freq)
         *freq = data.rate;
 
     return rc;
+}
+
+Result nvioctlChannel_SetModuleClockRate(u32 fd, u32 module_id, u32 freq) {
+    nvioctl_clk_rate data = {
+        .rate     = freq,
+        .moduleid = module_id,
+    };
+
+    return nvIoctl(fd, _NV_IOW(0, 0x08, data), &data);
+}
+
+Result nvioctlChannel_SetSubmitTimeout(u32 fd, u32 timeout) {
+    struct {
+        __nv_in u32 timeout;
+    } data = {
+        .timeout = timeout,
+    };
+
+    return nvIoctl(fd, _NV_IOW(0, 0x07, data), &data);
 }
 
 Result nvioctlChannel_MapCommandBuffer(u32 fd, nvioctl_command_buffer_map *maps, u32 num_maps, bool compressed) {

@@ -354,8 +354,10 @@ Result usbHsIfOpenUsbEp(UsbHsClientIfSession* s, UsbHsClientEpSession* ep, u16 m
             if (R_SUCCEEDED(rc)) rc = _usbHsGetEvent(&ep->s, &ep->eventXfer, false, 2);
         }
 
+        if (R_SUCCEEDED(rc)) ep->maxUrbCount = maxUrbCount;
+
         if (R_FAILED(rc)) {
-            serviceAssumeDomain(&s->s);
+            serviceAssumeDomain(&ep->s);
             serviceClose(&ep->s);
             eventClose(&ep->eventXfer);
         }
@@ -398,24 +400,57 @@ static Result _usbHsEpSubmitRequest(UsbHsClientEpSession* s, void* buffer, u32 s
     return rc;
 }
 
-static Result _usbHsEpPostBufferAsync(UsbHsClientEpSession* s, void* buffer, u32 size, u64 unk, u32* xferId) {
+Result usbHsEpPostBufferAsync(UsbHsClientEpSession* s, void* buffer, u32 size, u64 id, u32* xferId) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
     const struct {
         u32 size;
         u32 pad;
         u64 buffer;
-        u64 unk;
-    } in = { size, 0, (u64)buffer, unk };
+        u64 id;
+    } in = { size, 0, (u64)buffer, id };
 
     serviceAssumeDomain(&s->s);
     return serviceDispatchInOut(&s->s, 4, in, *xferId);
 }
 
-static Result _usbHsEpGetXferReport(UsbHsClientEpSession* s, UsbHsXferReport* reports, u32 max_reports, u32* count) {
-    serviceAssumeDomain(&s->s);
-    return serviceDispatchInOut(&s->s, 5, max_reports, *count,
+Result usbHsEpGetXferReport(UsbHsClientEpSession* s, UsbHsXferReport* reports, u32 max_reports, u32* count) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    if (s->ringbuf == NULL) {
+        serviceAssumeDomain(&s->s);
+        return serviceDispatchInOut(&s->s, 5, max_reports, *count,
         .buffer_attrs = { (hosversionBefore(3,0,0) ? SfBufferAttr_HipcMapAlias : SfBufferAttr_HipcAutoSelect) | SfBufferAttr_Out },
         .buffers = { { reports, max_reports*sizeof(UsbHsXferReport) } },
-    );
+        );
+    }
+
+    u32 total=0;
+
+    UsbHsRingHeader *hdr = (UsbHsRingHeader*)s->ringbuf;
+    UsbHsXferReport *ring_reports = (UsbHsXferReport*)(hdr+1);
+
+    memset(reports, 0, max_reports*sizeof(UsbHsXferReport));
+
+    for (u32 i=0; i<max_reports; i++) {
+        u64 write_index = hdr->write_index;
+        u64 read_index = hdr->read_index;
+
+        if (write_index == read_index) break;
+
+        if (read_index >= s->max_reports) return MAKERESULT(Module_Libnx, LibnxError_ShouldNotHappen); // Official sw would Abort here.
+        reports[i] = ring_reports[read_index];
+        __asm__ __volatile__ ("dmb sy" ::: "memory");
+        read_index = hdr->read_index;
+        hdr->read_index = (read_index+1) % s->max_reports;
+        total++;
+    }
+
+    *count = total;
+
+    return 0;
 }
 
 Result usbHsEpPostBuffer(UsbHsClientEpSession* s, void* buffer, u32 size, u32* transferredSize) {
@@ -426,7 +461,7 @@ Result usbHsEpPostBuffer(UsbHsClientEpSession* s, void* buffer, u32 size, u32* t
 
     if (hosversionBefore(2,0,0)) return _usbHsEpSubmitRequest(s, buffer, size, 0, transferredSize);
 
-    rc = _usbHsEpPostBufferAsync(s, buffer, size, 0, &xferId);
+    rc = usbHsEpPostBufferAsync(s, buffer, size, 0, &xferId);
     if (R_FAILED(rc)) return rc;
 
     rc = eventWait(&s->eventXfer, UINT64_MAX);
@@ -434,7 +469,7 @@ Result usbHsEpPostBuffer(UsbHsClientEpSession* s, void* buffer, u32 size, u32* t
     eventClear(&s->eventXfer);
 
     memset(&report, 0, sizeof(report));
-    rc = _usbHsEpGetXferReport(s, &report, 1, &count);
+    rc = usbHsEpGetXferReport(s, &report, 1, &count);
     if (R_FAILED(rc)) return rc;
 
     if (count<1) return MAKERESULT(Module_Libnx, LibnxError_BadInput);
@@ -442,6 +477,62 @@ Result usbHsEpPostBuffer(UsbHsClientEpSession* s, void* buffer, u32 size, u32* t
     *transferredSize = report.transferredSize;
     rc = report.res;
 
+    return rc;
+}
+
+Result usbHsEpBatchBufferAsync(UsbHsClientEpSession* s, void* buffer, u32* urbs, u32 urbCount, u64 id, u32 unk1, u32 unk2, u32* xferId) {
+    if (hosversionBefore(2,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    const struct {
+        u32 urbCount;
+        u32 unk1;
+        u32 unk2;
+        u32 pad;
+        u64 buffer;
+        u64 id;
+    } in = { urbCount, unk1, unk2, 0, (u64)buffer, id };
+
+    serviceAssumeDomain(&s->s);
+    return serviceDispatchInOut(&s->s, 6, in, *xferId,
+        .buffer_attrs = { (hosversionBefore(3,0,0) ? SfBufferAttr_HipcMapAlias : SfBufferAttr_HipcAutoSelect) | SfBufferAttr_In },
+        .buffers = { { urbs, urbCount*sizeof(u32) } },
+    );
+}
+
+Result usbHsEpCreateSmmuSpace(UsbHsClientEpSession* s, void* buffer, u32 size) {
+    if (hosversionBefore(4,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    const struct {
+        u32 size;
+        u32 pad;
+        u64 buffer;
+    } in = { size, 0, (u64)buffer };
+
+    serviceAssumeDomain(&s->s);
+    return serviceDispatchIn(&s->s, 7, in);
+}
+
+Result usbHsEpShareReportRing(UsbHsClientEpSession* s, void* buffer, size_t size) {
+    if (hosversionBefore(4,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+    if (s->ringbuf)
+        return MAKERESULT(Module_Libnx, LibnxError_AlreadyInitialized);
+
+    s->max_reports = s->maxUrbCount * 0x21;
+
+    TransferMemory tmem={};
+    Result rc = tmemCreateFromMemory(&tmem, buffer, size, Perm_Rw);
+    if (R_FAILED(rc)) return rc;
+
+    serviceAssumeDomain(&s->s);
+    rc = serviceDispatchIn(&s->s, 8, size,
+        .in_num_handles = 1,
+        .in_handles = { tmem.handle },
+    );
+    tmemClose(&tmem);
+    if (R_SUCCEEDED(rc)) s->ringbuf = buffer;
     return rc;
 }
 

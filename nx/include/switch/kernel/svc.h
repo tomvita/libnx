@@ -40,6 +40,8 @@ typedef enum {
     MemType_KernelStack=0x13,         ///< Mapped in kernel during \ref svcCreateThread.
     MemType_CodeReadOnly=0x14,        ///< Mapped in kernel during \ref svcControlCodeMemory.
     MemType_CodeWritable=0x15,        ///< Mapped in kernel during \ref svcControlCodeMemory.
+    MemType_Coverage=0x16,            ///< Not available.
+    MemType_Insecure=0x17,            ///< Mapped in kernel during \ref svcMapInsecurePhysicalMemory.
 } MemoryType;
 
 /// Memory state bitmasks.
@@ -67,10 +69,11 @@ typedef enum {
 
 /// Memory attribute bitmasks.
 typedef enum {
-    MemAttr_IsBorrowed=BIT(0),     ///< Is borrowed memory.
-    MemAttr_IsIpcMapped=BIT(1),    ///< Is IPC mapped (when IpcRefCount > 0).
-    MemAttr_IsDeviceMapped=BIT(2), ///< Is device mapped (when DeviceRefCount > 0).
-    MemAttr_IsUncached=BIT(3),     ///< Is uncached.
+    MemAttr_IsBorrowed=BIT(0),         ///< Is borrowed memory.
+    MemAttr_IsIpcMapped=BIT(1),        ///< Is IPC mapped (when IpcRefCount > 0).
+    MemAttr_IsDeviceMapped=BIT(2),     ///< Is device mapped (when DeviceRefCount > 0).
+    MemAttr_IsUncached=BIT(3),         ///< Is uncached.
+    MemAttr_IsPermissionLocked=BIT(4), ///< Is permission locked.
 } MemoryAttribute;
 
 /// Memory permission bitmasks.
@@ -91,8 +94,8 @@ typedef struct {
     u32 type;            ///< Memory type (see lower 8 bits of \ref MemoryState).
     u32 attr;            ///< Memory attributes (see \ref MemoryAttribute).
     u32 perm;            ///< Memory permissions (see \ref Permission).
-    u32 device_refcount; ///< Device reference count.
     u32 ipc_refcount;    ///< IPC reference count.
+    u32 device_refcount; ///< Device reference count.
     u32 padding;         ///< Padding.
 } MemoryInfo;
 
@@ -106,7 +109,7 @@ typedef struct {
 /// Secure monitor arguments.
 typedef struct {
     u64 X[8]; ///< Values of X0 through X7.
-} PACKED SecmonArgs;
+} NX_PACKED SecmonArgs;
 
 /// Break reasons
 typedef enum {
@@ -204,8 +207,14 @@ typedef enum {
     InfoType_UsedNonSystemMemorySize        = 22, ///< [6.0.0+] Amount of memory used by process, excluding that for process memory management.
     InfoType_IsApplication                  = 23, ///< [9.0.0+] Whether the specified process is an Application.
     InfoType_FreeThreadCount                = 24, ///< [11.0.0+] The number of free threads available to the process's resource limit.
+    InfoType_ThreadTickCount                = 25, ///< [13.0.0+] Number of ticks spent on thread.
+    InfoType_IsSvcPermitted                 = 26, ///< [14.0.0+] Does process have access to SVC (only usable with \ref svcSynchronizePreemptionState at present).
+    InfoType_IoRegionHint                   = 27, ///< [16.0.0+] Low bits of the physical address for a KIoRegion.
+    InfoType_AliasRegionExtraSize           = 28, ///< [18.0.0+] Extra size added to the reserved region.
 
-    InfoType_ThreadTickCount                = 0xF0000002, ///< Number of ticks spent on thread.
+    InfoType_TransferMemoryHint             = 34, ///< [19.0.0+] Low bits of the process address for a KTransferMemory.
+
+    InfoType_ThreadTickCountDeprecated      = 0xF0000002, ///< [1.0.0-12.1.0] Number of ticks spent on thread.
 } InfoType;
 
 /// GetSystemInfo IDs.
@@ -255,9 +264,10 @@ typedef enum {
 
 /// WaitForAddress behaviors.
 typedef enum {
-    ArbitrationType_WaitIfLessThan             = 0, ///< Wait if the value is less than argument.
-    ArbitrationType_DecrementAndWaitIfLessThan = 1, ///< Decrement the value and wait if it is less than argument.
-    ArbitrationType_WaitIfEqual                = 2, ///< Wait if the value is equal to argument.
+    ArbitrationType_WaitIfLessThan             = 0, ///< Wait if the 32-bit value is less than argument.
+    ArbitrationType_DecrementAndWaitIfLessThan = 1, ///< Decrement the 32-bit value and wait if it is less than argument.
+    ArbitrationType_WaitIfEqual                = 2, ///< Wait if the 32-bit value is equal to argument.
+    ArbitrationType_WaitIfEqual64              = 3, ///< [19.0.0+] Wait if the 64-bit value is equal to argument.
 } ArbitrationType;
 
 /// Context of a scheduled thread.
@@ -267,6 +277,18 @@ typedef struct {
     u64 lr; ///< Link Register for the thread.
     u64 pc; ///< Program Counter for the thread.
 } LastThreadContext;
+
+/// Memory mapping type.
+typedef enum {
+    MemoryMapping_IoRegister = 0, ///< Mapping IO registers.
+    MemoryMapping_Uncached   = 1, ///< Mapping normal memory without cache.
+    MemoryMapping_Memory     = 2, ///< Mapping normal memory.
+} MemoryMapping;
+
+/// Io Pools.
+typedef enum {
+    IoPoolType_PcieA2 = 0, ///< Physical address range 0x12000000-0x1FFFFFFF
+} IoPoolType;
 
 ///@name Memory management
 ///@{
@@ -345,7 +367,7 @@ Result svcQueryMemory(MemoryInfo* meminfo_ptr, u32 *pageinfo, u64 addr);
  * @note Syscall number 0x07.
  */
 
-void NORETURN svcExitProcess(void);
+void NX_NORETURN svcExitProcess(void);
 
 /**
  * @brief Creates a thread.
@@ -365,7 +387,7 @@ Result svcStartThread(Handle handle);
  * @brief Exits the current thread.
  * @note Syscall number 0x0A.
  */
-void NORETURN svcExitThread(void);
+void NX_NORETURN svcExitThread(void);
 
 /**
  * @brief Sleeps the current thread for the specified amount of time.
@@ -651,7 +673,7 @@ Result svcOutputDebugString(const char *str, u64 size);
  * @param[in] res Result code.
  * @note Syscall number 0x28.
  */
-void NORETURN svcReturnFromException(Result res);
+void NX_NORETURN svcReturnFromException(Result res);
 
 /**
  * @brief Retrieves information about the system, or a certain kernel object.
@@ -790,7 +812,7 @@ Result svcGetThreadContext3(ThreadContext* ctx, Handle thread);
  * @return Result code.
  * @note Syscall number 0x34.
  */
-Result svcWaitForAddress(void *address, u32 arb_type, s32 value, s64 timeout);
+Result svcWaitForAddress(void *address, u32 arb_type, s64 value, s64 timeout);
 
 /**
  * @brief Signals (and updates) an address depending on type and value. [4.0.0+]
@@ -826,6 +848,27 @@ void svcSynchronizePreemptionState(void);
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
 Result svcGetResourceLimitPeakValue(s64 *out, Handle reslimit_h, LimitableResource which);
+
+///@}
+
+///@name Memory Management
+///@{
+
+/**
+ * @brief Creates an IO Pool. [13.0.0+]
+ * @return Result code.
+ * @note Syscall number 0x39.
+ * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
+ */
+Result svcCreateIoPool(Handle *out_handle, u32 pool_type);
+
+/**
+ * @brief Creates an IO Region. [13.0.0+]
+ * @return Result code.
+ * @note Syscall number 0x3A.
+ * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
+ */
+Result svcCreateIoRegion(Handle *out_handle, Handle io_pool_h, u64 physical_address, u64 size, u32 memory_mapping, u32 perm);
 
 ///@}
 
@@ -922,6 +965,22 @@ Result svcCreateEvent(Handle* server_handle, Handle* client_handle);
 
 ///@name Memory management
 ///@{
+
+/**
+ * @brief Maps an IO Region. [13.0.0+]
+ * @return Result code.
+ * @note Syscall number 0x46.
+ * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
+ */
+Result svcMapIoRegion(Handle io_region_h, void *address, u64 size, u32 perm);
+
+/**
+ * @brief Undoes the effects of \ref svcMapIoRegion. [13.0.0+]
+ * @return Result code.
+ * @note Syscall number 0x47.
+ * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
+ */
+Result svcUnmapIoRegion(Handle io_region_h, void *address, u64 size);
 
 /**
  * @brief Maps unsafe memory (usable for GPU DMA) for a system module at the desired address. [5.0.0+]
@@ -1064,14 +1123,14 @@ Result svcQueryPhysicalAddress(PhysicalMemoryInfo *out, u64 virtaddr);
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning Only exists on [10.0.0+]. For older versions use \ref svcLegacyQueryIoMapping.
  */
-Result svcQueryIoMapping(u64* virtaddr, u64* out_size, u64 physaddr, u64 size);
+Result svcQueryMemoryMapping(u64* virtaddr, u64* out_size, u64 physaddr, u64 size);
 
 /**
  * @brief Returns a virtual address mapped to a given IO range.
  * @return Result code.
  * @note Syscall number 0x55.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
- * @warning Only exists on [1.0.0-9.2.0]. For newer versions use \ref svcQueryIoMapping.
+ * @warning Only exists on [1.0.0-9.2.0]. For newer versions use \ref svcQueryMemoryMapping.
  */
 Result svcLegacyQueryIoMapping(u64* virtaddr, u64 physaddr, u64 size);
 
@@ -1111,7 +1170,7 @@ Result svcDetachDeviceAddressSpace(u64 device, Handle handle);
  * @note Syscall number 0x59.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcMapDeviceAddressSpaceByForce(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 perm);
+Result svcMapDeviceAddressSpaceByForce(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 option);
 
 /**
  * @brief Maps an attached device address space to an userspace address.
@@ -1120,10 +1179,10 @@ Result svcMapDeviceAddressSpaceByForce(Handle handle, Handle proc_handle, u64 ma
  * @note Syscall number 0x5A.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcMapDeviceAddressSpaceAligned(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 perm);
+Result svcMapDeviceAddressSpaceAligned(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 option);
 
 /**
- * @brief Maps an attached device address space to an userspace address.
+ * @brief Maps an attached device address space to an userspace address. [1.0.0-12.1.0]
  * @return Result code.
  * @remark The userspace destination address must have the \ref MemState_MapDeviceAlignedAllowed bit set.
  * @note Syscall number 0x5B.
@@ -1511,10 +1570,28 @@ Result svcSetResourceLimitLimitValue(Handle reslimit, LimitableResource which, u
 /**
  * @brief Calls a secure monitor function (TrustZone, EL3).
  * @param regs Arguments to pass to the secure monitor.
- * @return Return value from the secure monitor.
  * @note Syscall number 0x7F.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-u64 svcCallSecureMonitor(SecmonArgs* regs);
+void svcCallSecureMonitor(SecmonArgs* regs);
+
+///@}
+
+///@name Memory management
+///@{
+
+/**
+ * @brief Maps new insecure memory at the desired address. [15.0.0+]
+ * @return Result code.
+ * @note Syscall number 0x90.
+ */
+Result svcMapInsecurePhysicalMemory(void *address, u64 size);
+
+/**
+ * @brief Undoes the effects of \ref svcMapInsecureMemory. [15.0.0+]
+ * @return Result code.
+ * @note Syscall number 0x91.
+ */
+Result svcUnmapInsecurePhysicalMemory(void *address, u64 size);
 
 ///@}
