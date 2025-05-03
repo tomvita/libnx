@@ -88,7 +88,8 @@ Result pmdmntHookToCreateProcess(Event* out_event, u64 program_id) {
 }
 
 Result pmdmntGetApplicationProcessId(u64* pid_out) {
-    const u64 cmd_id = hosversionAtLeast(5,0,0) ? 4 : 5;
+    // const u64 cmd_id = hosversionAtLeast(5,0,0) ? 4 : 5;
+    u64 cmd_id = 4;
     return serviceDispatchOut(&g_pmdmntSrv, cmd_id, *pid_out);
 }
 
