@@ -242,7 +242,7 @@ typedef struct {
 
                 struct {
                     u32 res;                    ///< Always 0.
-                    u8 unk_x4;                  ///< Always 0.
+                    u8 proto_mode;              ///< Protocol mode. Always 0 (report mode).
                     BtdrvAddress addr;          ///< \ref BtdrvAddress
                     u8 pad;                     ///< Padding
                     BtdrvHidReport report;
@@ -372,8 +372,8 @@ typedef struct {
         struct {
             u32 result;                         ///< 0 for success, non-zero for error.
             u8 status;                          ///< Connection status. 0 = Connected, 2 = Disconnected
-            u16 server_if;                      ///< Server interface handle
-            u8 pad;                             ///< Padding
+            u8 server_if;                       ///< Server interface handle
+            u8 pad[2];                          ///< Padding
             u32 conn_id;                        ///< Connection ID
             BtdrvAddress address;               ///< Device address
             u16 reason;                         ///< Disconnection reason
@@ -670,9 +670,9 @@ Result btdrvGetHidReport(BtdrvAddress addr, u8 report_id, BtdrvBluetoothHhReport
  * @brief TriggerConnection
  * @note This is used by btm-sysmodule.
  * @param[in] addr \ref BtdrvAddress
- * @param[in] unk [9.0.0+] Unknown
+ * @param[in] timeout [9.0.0+] Host trigger timeout
  */
-Result btdrvTriggerConnection(BtdrvAddress addr, u16 unk);
+Result btdrvTriggerConnection(BtdrvAddress addr, u16 timeout);
 
 /**
  * @brief AddPairedDeviceInfo
