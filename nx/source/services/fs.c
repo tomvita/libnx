@@ -623,6 +623,13 @@ Result fsGetAndClearErrorInfo(FsFileSystemProxyErrorInfo *out) {
     return _fsObjectDispatchOut(&g_fsSrv, 800, *out);
 }
 
+Result fsGetContentStorageInfoIndex(s32 *out) {
+    if (hosversionBefore(19,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _fsCmdNoInOutU32(&g_fsSrv, (u32 *)out, 820);
+}
+
 Result fsDisableAutoSaveDataCreation(void) {
     return _fsCmdNoIO(&g_fsSrv, 1003);
 }
@@ -937,6 +944,13 @@ Result fsFsQueryEntry(FsFileSystem* fs, void *out, size_t out_size, const void *
     );
 }
 
+Result fsFsGetFileSystemAttribute(FsFileSystem* fs, FsFileSystemAttribute *out) {
+    if (hosversionBefore(15,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _fsObjectDispatchOut(&fs->s, 16, *out);
+}
+
 Result fsFsSetConcatenationFileAttribute(FsFileSystem* fs, const char *path) {
     return fsFsQueryEntry(fs, NULL, 0, NULL, 0, path, FsFileSystemQueryId_SetConcatenationFileAttribute);
 }
@@ -1226,6 +1240,32 @@ Result fsDeviceOperatorGetGameCardAttribute(FsDeviceOperator* d, const FsGameCar
     return _fsObjectDispatchInOut(&d->s, 205, *handle, *out);
 }
 
+Result fsDeviceOperatorGetGameCardDeviceCertificate(FsDeviceOperator* d, const FsGameCardHandle* handle, void* dst, size_t dst_size, s64* out_size, s64 size) {
+    const struct {
+        FsGameCardHandle handle;
+        s64 buffer_size;
+    } in = { *handle, size };
+
+    // Assume old gamecard certificate size on pre-19.0.0
+    s64 os = 0x200;
+    Result rc;
+
+    if (hosversionAtLeast(19,0,0)) {
+        rc = _fsObjectDispatchInOut(&d->s, 206, in, os,
+        .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_Out },
+        .buffers = { { dst, dst_size } });
+    } else {
+        rc = _fsObjectDispatchIn(&d->s, 206, in,
+        .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_Out },
+        .buffers = { { dst, dst_size } });
+    }
+
+    if (R_SUCCEEDED(rc))
+        *out_size = os;
+
+    return rc;
+}
+
 Result fsDeviceOperatorGetGameCardIdSet(FsDeviceOperator* d, void* dst, size_t dst_size, s64 size) {
     return _fsCmdInSizeOutBuffer(&d->s, dst, dst_size, size, 208);
 }
@@ -1240,6 +1280,24 @@ Result fsDeviceOperatorGetGameCardDeviceId(FsDeviceOperator* d, void* dst, size_
     if (hosversionBefore(3,0,0))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
     return _fsCmdInSizeOutBuffer(&d->s, dst, dst_size, size, 218);
+}
+
+Result fsDeviceOperatorChallengeCardExistence(FsDeviceOperator* d, const FsGameCardHandle* handle, void* dst, size_t dst_size, void* seed, size_t seed_size, void* value, size_t value_size) {
+    if (hosversionBefore(8,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _fsObjectDispatchIn(&d->s, 219, *handle,
+        .buffer_attrs = {
+            SfBufferAttr_HipcMapAlias | SfBufferAttr_Out,
+            SfBufferAttr_HipcMapAlias | SfBufferAttr_In,
+            SfBufferAttr_HipcMapAlias | SfBufferAttr_In,
+        },
+        .buffers = {
+            { dst,   dst_size   },
+            { seed,  seed_size  },
+            { value, value_size },
+        },
+    );
 }
 
 void fsDeviceOperatorClose(FsDeviceOperator* d) {

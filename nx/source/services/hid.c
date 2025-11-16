@@ -466,6 +466,33 @@ size_t hidGetKeyboardStates(HidKeyboardState *states, size_t count) {
     return total;
 }
 
+size_t hidGetHomeButtonStates(HidHomeButtonState *states, size_t count) {
+    HidSharedMemory *sharedmem = (HidSharedMemory*)hidGetSharedmemAddr();
+    if (sharedmem == NULL)
+        diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_NotInitialized));
+
+    size_t total = _hidGetStates(&sharedmem->home_button.lifo.header, sharedmem->home_button.lifo.storage, 17, offsetof(HidHomeButtonStateAtomicStorage,state), offsetof(HidHomeButtonState,sampling_number), states, sizeof(HidHomeButtonState), count);
+    return total;
+}
+
+size_t hidGetSleepButtonStates(HidSleepButtonState *states, size_t count) {
+    HidSharedMemory *sharedmem = (HidSharedMemory*)hidGetSharedmemAddr();
+    if (sharedmem == NULL)
+        diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_NotInitialized));
+
+    size_t total = _hidGetStates(&sharedmem->sleep_button.lifo.header, sharedmem->sleep_button.lifo.storage, 17, offsetof(HidSleepButtonStateAtomicStorage,state), offsetof(HidSleepButtonState,sampling_number), states, sizeof(HidSleepButtonState), count);
+    return total;
+}
+
+size_t hidGetCaptureButtonStates(HidCaptureButtonState *states, size_t count) {
+    HidSharedMemory *sharedmem = (HidSharedMemory*)hidGetSharedmemAddr();
+    if (sharedmem == NULL)
+        diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_NotInitialized));
+
+    size_t total = _hidGetStates(&sharedmem->capture_button.lifo.header, sharedmem->capture_button.lifo.storage, 17, offsetof(HidCaptureButtonStateAtomicStorage,state), offsetof(HidCaptureButtonState,sampling_number), states, sizeof(HidCaptureButtonState), count);
+    return total;
+}
+
 void hidInitializeNpad(void) {
     Result rc = _hidActivateNpad();
     if (R_FAILED(rc)) diagAbortWithResult(rc);
@@ -1385,6 +1412,8 @@ static Result _hidActivateNpad(void) {
         revision = 0x2; // [6.0.0+]
     if (hosversionAtLeast(8,0,0))
         revision = 0x3; // [8.0.0+]
+    if (hosversionAtLeast(18,0,0))
+        revision = 0x5; // [18.0.0+]
 
     return _hidCmdInU32AruidNoOut(revision, 109); // ActivateNpadWithRevision
 }

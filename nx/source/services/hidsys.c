@@ -340,6 +340,49 @@ Result hidsysEnableAppletToGetInput(bool enable) {
     return serviceDispatchIn(&g_hidsysSrv, 503, in);
 }
 
+Result hidsysEnableHandheldHids(void) {
+    return _hidsysCmdNoIO(520);
+}
+
+Result hidsysDisableHandheldHids(void) {
+    return _hidsysCmdNoIO(521);
+}
+
+Result hidsysSetJoyConRailEnabled(bool enable) {
+    if (hosversionBefore(9,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _hidsysCmdInBoolNoOut(enable, 522);
+}
+
+Result hidsysIsJoyConRailEnabled(bool *out) {
+    if (hosversionBefore(9,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _hidsysCmdNoInOutBool(out, 523);
+}
+
+Result hidsysIsHandheldHidsEnabled(bool *out) {
+    if (hosversionBefore(10,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _hidsysCmdNoInOutBool(out, 524);
+}
+
+Result hidsysIsJoyConAttachedOnAllRail(bool *out) {
+    if (hosversionBefore(11,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _hidsysCmdNoInOutBool(out, 525);
+}
+
+Result hidsysIsInvertedControllerConnectedOnRail(bool *out) {
+    if (hosversionBefore(19,0,0))
+        return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
+
+    return _hidsysCmdNoInOutBool(out, 526);
+}
+
 Result hidsysAcquireUniquePadConnectionEventHandle(Event *out_event) {
     Handle tmp_handle = INVALID_HANDLE;
 
@@ -497,14 +540,14 @@ Result hidsysLegacyIsButtonConfigSupported(HidsysUniquePadId unique_pad_id, bool
 }
 
 Result hidsysIsButtonConfigSupported(BtdrvAddress addr, bool *out) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInAddrOutBool(addr, out, 1200);
 }
 
 Result hidsysIsButtonConfigEmbeddedSupported(bool *out) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdNoInOutBool(out, 1201);
@@ -518,14 +561,14 @@ Result hidsysLegacyDeleteButtonConfig(HidsysUniquePadId unique_pad_id) {
 }
 
 Result hidsysDeleteButtonConfig(BtdrvAddress addr) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInAddrNoOut(addr, 1202);
 }
 
 Result hidsysDeleteButtonConfigEmbedded(void) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdNoIO(1203);
@@ -539,14 +582,14 @@ Result hidsysLegacySetButtonConfigEnabled(HidsysUniquePadId unique_pad_id, bool 
 }
 
 Result hidsysSetButtonConfigEnabled(BtdrvAddress addr, bool flag) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInAddrInBoolNoOut(addr, flag, 1204);
 }
 
 Result hidsysSetButtonConfigEmbeddedEnabled(bool flag) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInBoolNoOut(flag, 1205);
@@ -560,14 +603,14 @@ Result hidsysLegacyIsButtonConfigEnabled(HidsysUniquePadId unique_pad_id, bool *
 }
 
 Result hidsysIsButtonConfigEnabled(BtdrvAddress addr, bool *out) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInAddrInBoolNoOut(addr, out, 1206);
 }
 
 Result hidsysIsButtonConfigEmbeddedEnabled(bool *out) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdNoInOutBool(out, 1207);
@@ -581,7 +624,7 @@ Result hidsysLegacySetButtonConfigEmbedded(HidsysUniquePadId unique_pad_id, cons
 }
 
 Result hidsysSetButtonConfigEmbedded(const HidsysButtonConfigEmbedded *config) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return serviceDispatch(&g_hidsysSrv, 1208,
@@ -598,7 +641,7 @@ Result hidsysLegacySetButtonConfigFull(HidsysUniquePadId unique_pad_id, const Hi
 }
 
 Result hidsysSetButtonConfigFull(BtdrvAddress addr, const HidsysButtonConfigFull *config) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInAddrInBufFixedNoOut(addr, config, sizeof(*config), 1209);
@@ -612,7 +655,7 @@ Result hidsysLegacySetButtonConfigLeft(HidsysUniquePadId unique_pad_id, const Hi
 }
 
 Result hidsysSetButtonConfigLeft(BtdrvAddress addr, const HidsysButtonConfigLeft *config) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInAddrInBufFixedNoOut(addr, config, sizeof(*config), 12010);
@@ -626,7 +669,7 @@ Result hidsysLegacySetButtonConfigRight(HidsysUniquePadId unique_pad_id, const H
 }
 
 Result hidsysSetButtonConfigRight(BtdrvAddress addr, const HidsysButtonConfigRight *config) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInAddrInBufFixedNoOut(addr, config, sizeof(*config), 1211);
@@ -640,7 +683,7 @@ Result hidsysLegacyGetButtonConfigEmbedded(HidsysUniquePadId unique_pad_id, Hids
 }
 
 Result hidsysGetButtonConfigEmbedded(HidsysButtonConfigEmbedded *config) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return serviceDispatch(&g_hidsysSrv, 1212,
@@ -657,7 +700,7 @@ Result hidsysLegacyGetButtonConfigFull(HidsysUniquePadId unique_pad_id, HidsysBu
 }
 
 Result hidsysGetButtonConfigFull(BtdrvAddress addr, HidsysButtonConfigFull *config) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInAddrOutBufFixedNoOut(addr, config, sizeof(*config), 1213);
@@ -671,7 +714,7 @@ Result hidsysLegacyGetButtonConfigLeft(HidsysUniquePadId unique_pad_id, HidsysBu
 }
 
 Result hidsysGetButtonConfigLeft(BtdrvAddress addr, HidsysButtonConfigLeft *config) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInAddrOutBufFixedNoOut(addr, config, sizeof(*config), 1214);
@@ -685,7 +728,7 @@ Result hidsysLegacyGetButtonConfigRight(HidsysUniquePadId unique_pad_id, HidsysB
 }
 
 Result hidsysGetButtonConfigRight(BtdrvAddress addr, HidsysButtonConfigRight *config) {
-    if (hosversionBefore(11,0,0))
+    if (!hosversionBetween(11,18))
         return MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer);
 
     return _hidsysCmdInAddrOutBufFixedNoOut(addr, config, sizeof(*config), 1215);

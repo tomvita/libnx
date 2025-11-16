@@ -192,7 +192,7 @@ typedef enum {
     InfoType_UsedMemorySize                 = 7,  ///< Amount of memory currently used by process.
     InfoType_DebuggerAttached               = 8,  ///< Whether current process is being debugged.
     InfoType_ResourceLimit                  = 9,  ///< Current process's resource limit handle.
-    InfoType_IdleTickCount                  = 10, ///< Number of idle ticks on CPU.
+    InfoType_IdleTickCount                  = 10, ///< Number of idle ticks on CPU (only usable with current thread's core).
     InfoType_RandomEntropy                  = 11, ///< [2.0.0+] Random entropy for current process.
     InfoType_AslrRegionAddress              = 12, ///< [2.0.0+] Base of the process's address space.
     InfoType_AslrRegionSize                 = 13, ///< [2.0.0+] Size of the process's address space.
@@ -209,6 +209,10 @@ typedef enum {
     InfoType_FreeThreadCount                = 24, ///< [11.0.0+] The number of free threads available to the process's resource limit.
     InfoType_ThreadTickCount                = 25, ///< [13.0.0+] Number of ticks spent on thread.
     InfoType_IsSvcPermitted                 = 26, ///< [14.0.0+] Does process have access to SVC (only usable with \ref svcSynchronizePreemptionState at present).
+    InfoType_IoRegionHint                   = 27, ///< [16.0.0+] Low bits of the physical address for a KIoRegion.
+    InfoType_AliasRegionExtraSize           = 28, ///< [18.0.0+] Extra size added to the reserved region.
+
+    InfoType_TransferMemoryHint             = 34, ///< [19.0.0+] Low bits of the process address for a KTransferMemory.
 
     InfoType_ThreadTickCountDeprecated      = 0xF0000002, ///< [1.0.0-12.1.0] Number of ticks spent on thread.
 } InfoType;
@@ -227,7 +231,7 @@ typedef enum {
     TickCountInfo_Core2 = 2,       ///< Tick count on core 2.
     TickCountInfo_Core3 = 3,       ///< Tick count on core 3.
 
-    TickCountInfo_Total = UINT64_MAX, ///< Tick count on all cores.
+    TickCountInfo_Total = UINT64_MAX, ///< ThreadTickCount: Tick count on all cores, IdleTickCount: Thread's current core.
 } TickCountInfo;
 
 /// GetInfo InitialProcessIdRange Sub IDs.
@@ -260,9 +264,10 @@ typedef enum {
 
 /// WaitForAddress behaviors.
 typedef enum {
-    ArbitrationType_WaitIfLessThan             = 0, ///< Wait if the value is less than argument.
-    ArbitrationType_DecrementAndWaitIfLessThan = 1, ///< Decrement the value and wait if it is less than argument.
-    ArbitrationType_WaitIfEqual                = 2, ///< Wait if the value is equal to argument.
+    ArbitrationType_WaitIfLessThan             = 0, ///< Wait if the 32-bit value is less than argument.
+    ArbitrationType_DecrementAndWaitIfLessThan = 1, ///< Decrement the 32-bit value and wait if it is less than argument.
+    ArbitrationType_WaitIfEqual                = 2, ///< Wait if the 32-bit value is equal to argument.
+    ArbitrationType_WaitIfEqual64              = 3, ///< [19.0.0+] Wait if the 64-bit value is equal to argument.
 } ArbitrationType;
 
 /// Context of a scheduled thread.
@@ -291,7 +296,7 @@ typedef enum {
 /**
  * @brief Set the process heap to a given size. It can both extend and shrink the heap.
  * @param[out] out_addr Variable to which write the address of the heap (which is randomized and fixed by the kernel)
- * @param[in] size Size of the heap, must be a multiple of 0x200000 and [2.0.0+] less than 0x18000000.
+ * @param[in] size Size of the heap, must be a multiple of 0x200000.
  * @return Result code.
  * @note Syscall number 0x01.
  */
@@ -807,7 +812,7 @@ Result svcGetThreadContext3(ThreadContext* ctx, Handle thread);
  * @return Result code.
  * @note Syscall number 0x34.
  */
-Result svcWaitForAddress(void *address, u32 arb_type, s32 value, s64 timeout);
+Result svcWaitForAddress(void *address, u32 arb_type, s64 value, s64 timeout);
 
 /**
  * @brief Signals (and updates) an address depending on type and value. [4.0.0+]
