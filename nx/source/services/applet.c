@@ -276,8 +276,7 @@ Result _appletInitialize(void) {
         //Don't enter this msg-loop when g_appletFocusState is already 1, it will hang when applet was previously initialized in the context of the current process for AppletType_Application.
         if (R_SUCCEEDED(rc) && g_appletFocusState != AppletFocusState_InFocus) {
             do {
-                if (R_FAILED(eventWait(&g_appletMessageEvent, 0)))
-                    break; // No pending message, skip blocking wait for focus.
+                eventWait(&g_appletMessageEvent, UINT64_MAX);
 
                 u32 msg;
                 rc = _appletReceiveMessage(&msg);
