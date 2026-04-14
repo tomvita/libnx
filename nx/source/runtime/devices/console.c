@@ -619,7 +619,7 @@ PrintConsole* consoleInit(PrintConsole* console) {
 
 	if (!console->consoleInitialised && console->renderer->init(console)) {
 		console->consoleInitialised = true;
-		consoleCls('2');
+		consoleCls(2);
 		return console;
 	}
 
@@ -749,7 +749,7 @@ void consolePrintChar(int c) {
 //---------------------------------------------------------------------------------
 void consoleClear(void) {
 //---------------------------------------------------------------------------------
-	consoleCls ('2');
+	consoleCls (2);
 }
 
 //---------------------------------------------------------------------------------
